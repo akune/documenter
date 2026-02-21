@@ -15,44 +15,44 @@ services:
     
     environment:
       # Logging
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       
       # OCR Settings
-      - OCR_LANGUAGE=deu+eng              # German + English
-      - OCR_DESKEW=true                   # Deskew pages
-      - OCR_CLEAN=true                    # Clean pages (remove noise)
-      - OCR_ROTATE_PAGES=true             # Auto-rotate pages
+      - OCR_LANGUAGE=${OCR_LANGUAGE:-deu+eng}
+      - OCR_DESKEW=${OCR_DESKEW:-true}
+      - OCR_CLEAN=${OCR_CLEAN:-true}
+      - OCR_ROTATE_PAGES=${OCR_ROTATE_PAGES:-true}
       
       # Blank page detection
-      - BLANK_PAGE_REMOVAL=true           # Enable blank page removal
-      - BLANK_PAGE_THRESHOLD=0.99         # Threshold (0.99 = 99% white)
+      - BLANK_PAGE_REMOVAL=${BLANK_PAGE_REMOVAL:-true}
+      - BLANK_PAGE_THRESHOLD=${BLANK_PAGE_THRESHOLD:-0.99}
       
       # QR code document splitting
-      - SPLIT_QR_ENABLED=true             # Enable QR code based splitting
-      - SPLIT_QR_CONTENT=dmsqrnd          # QR code content that triggers split
+      - SPLIT_QR_ENABLED=${SPLIT_QR_ENABLED:-true}
+      - SPLIT_QR_CONTENT=${SPLIT_QR_CONTENT:-dmsqrnd}
       
       # Nextcloud settings
-      - NEXTCLOUD_ENABLED=true
-      - NEXTCLOUD_URL=https://cloud.example.com
-      - NEXTCLOUD_USER=your_username
-      - NEXTCLOUD_PASSWORD=your_app_password
-      - NEXTCLOUD_TARGET_DIR=/Documents/Scans
+      - NEXTCLOUD_ENABLED=${NEXTCLOUD_ENABLED:-false}
+      - NEXTCLOUD_URL=${NEXTCLOUD_URL:-}
+      - NEXTCLOUD_USER=${NEXTCLOUD_USER:-}
+      - NEXTCLOUD_PASSWORD=${NEXTCLOUD_PASSWORD:-}
+      - NEXTCLOUD_TARGET_DIR=${NEXTCLOUD_TARGET_DIR:-/Documents/Scans}
       
       # Paperless-ngx settings
-      - PAPERLESS_ENABLED=true
-      - PAPERLESS_URL=https://paperless.example.com
-      - PAPERLESS_API_TOKEN=your_api_token
-      - PAPERLESS_DEFAULT_TAGS=Inbox      # Comma-separated default tags
+      - PAPERLESS_ENABLED=${PAPERLESS_ENABLED:-false}
+      - PAPERLESS_URL=${PAPERLESS_URL:-}
+      - PAPERLESS_API_TOKEN=${PAPERLESS_API_TOKEN:-}
+      - PAPERLESS_DEFAULT_TAGS=${PAPERLESS_DEFAULT_TAGS:-Inbox}
       
       # Processing settings
-      - DELETE_SOURCE=true                # Delete source after processing
-      - FILE_STABILITY_SECONDS=5          # Wait for file to stabilize
-      - POLL_INTERVAL=1.0                 # File check interval
+      - DELETE_SOURCE=${DELETE_SOURCE:-true}
+      - FILE_STABILITY_SECONDS=${FILE_STABILITY_SECONDS:-5}
+      - POLL_INTERVAL=${POLL_INTERVAL:-1.0}
       
       # Output directory settings
-      - OUTPUT_DIR_ENABLED=false          # Write processed files to output dir
-      - OUTPUT_DIR=/output                # Output directory path
-      - OUTPUT_DIR_USE_SUBFOLDERS=true    # Use YYYY-MM subfolders
+      - OUTPUT_DIR_ENABLED=${OUTPUT_DIR_ENABLED:-false}
+      - OUTPUT_DIR=${OUTPUT_DIR:-/output}
+      - OUTPUT_DIR_USE_SUBFOLDERS=${OUTPUT_DIR_USE_SUBFOLDERS:-true}
     
     # Optional: Use host network if needed for local services
     # network_mode: host
