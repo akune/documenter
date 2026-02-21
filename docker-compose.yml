@@ -1,0 +1,65 @@
+services:
+  documenter:
+    build: .
+    image: documenter:latest
+    container_name: documenter
+    restart: unless-stopped
+    
+    volumes:
+      # Input directory for scanned PDFs
+      - ./input:/input
+      # Output directory for processed PDFs (optional)
+      - ./output:/output
+      # Temporary processing directory (can use tmpfs for performance)
+      - /tmp/documenter:/tmp/processing
+    
+    environment:
+      # Logging
+      - LOG_LEVEL=INFO
+      
+      # OCR Settings
+      - OCR_LANGUAGE=deu+eng              # German + English
+      - OCR_DESKEW=true                   # Deskew pages
+      - OCR_CLEAN=true                    # Clean pages (remove noise)
+      - OCR_ROTATE_PAGES=true             # Auto-rotate pages
+      
+      # Blank page detection
+      - BLANK_PAGE_REMOVAL=true           # Enable blank page removal
+      - BLANK_PAGE_THRESHOLD=0.99         # Threshold (0.99 = 99% white)
+      
+      # QR code document splitting
+      - SPLIT_QR_ENABLED=true             # Enable QR code based splitting
+      - SPLIT_QR_CONTENT=dmsqrnd          # QR code content that triggers split
+      
+      # Nextcloud settings
+      - NEXTCLOUD_ENABLED=true
+      - NEXTCLOUD_URL=https://cloud.example.com
+      - NEXTCLOUD_USER=your_username
+      - NEXTCLOUD_PASSWORD=your_app_password
+      - NEXTCLOUD_TARGET_DIR=/Documents/Scans
+      
+      # Paperless-ngx settings
+      - PAPERLESS_ENABLED=true
+      - PAPERLESS_URL=https://paperless.example.com
+      - PAPERLESS_API_TOKEN=your_api_token
+      - PAPERLESS_DEFAULT_TAGS=Inbox      # Comma-separated default tags
+      
+      # Processing settings
+      - DELETE_SOURCE=true                # Delete source after processing
+      - FILE_STABILITY_SECONDS=5          # Wait for file to stabilize
+      - POLL_INTERVAL=1.0                 # File check interval
+      
+      # Output directory settings
+      - OUTPUT_DIR_ENABLED=false          # Write processed files to output dir
+      - OUTPUT_DIR=/output                # Output directory path
+      - OUTPUT_DIR_USE_SUBFOLDERS=true    # Use YYYY-MM subfolders
+    
+    # Optional: Use host network if needed for local services
+    # network_mode: host
+    
+    # Optional: Resource limits
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 2G
