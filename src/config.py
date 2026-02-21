@@ -28,7 +28,7 @@ class Config:
     
     # QR code document splitting
     split_qr_enabled: bool = field(default_factory=lambda: os.getenv("SPLIT_QR_ENABLED", "true").lower() == "true")
-    split_qr_content: str = field(default_factory=lambda: os.getenv("SPLIT_QR_CONTENT", "dmsqrnd"))
+    split_qr_content: str = field(default_factory=lambda: os.getenv("SPLIT_QR_CONTENT", "[dmsqrnd]"))
     
     # Nextcloud settings
     nextcloud_enabled: bool = field(default_factory=lambda: os.getenv("NEXTCLOUD_ENABLED", "true").lower() == "true")

@@ -29,7 +29,7 @@ services:
       
       # QR code document splitting
       - SPLIT_QR_ENABLED=${SPLIT_QR_ENABLED:-true}
-      - SPLIT_QR_CONTENT=${SPLIT_QR_CONTENT:-dmsqrnd}
+      - SPLIT_QR_CONTENT=${SPLIT_QR_CONTENT:-[dmsqrnd]}
       
       # Nextcloud settings
       - NEXTCLOUD_ENABLED=${NEXTCLOUD_ENABLED:-false}

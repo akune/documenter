@@ -74,7 +74,7 @@ All settings are controlled via environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SPLIT_QR_ENABLED` | `true` | Enable |
-| `SPLIT_QR_CONTENT` | `dmsqrnd` | QR code content for splitting |
+| `SPLIT_QR_CONTENT` | `[dmsqrnd]` | QR code content for splitting |
 
 ### Nextcloud
 
@@ -178,6 +178,6 @@ docker compose logs -f documenter
 ### QR code splitting not working
 
 - QR code must be clearly readable (sufficient contrast)
-- Content must exactly match `SPLIT_QR_CONTENT` (default: `dmsqrnd`)
+- Content must exactly match `SPLIT_QR_CONTENT` (default: `[dmsqrnd]`)
 - QR-Code Generator: https://www.qr-code-generator.com/
 - Zum Testen: `SPLIT_QR_ENABLED=false` setzen
