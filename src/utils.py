@@ -44,8 +44,8 @@ def generate_filename(file_path: str, date: Optional[datetime] = None) -> str:
     # Calculate MD5 hash (shortened to 8 characters)
     file_hash = calculate_md5(file_path)[:8]
     
-    # Format filename with date, time (24h format), and short hash
-    return f"{date.strftime('%Y-%m-%d_%H-%M')}_{file_hash}.pdf"
+    # Format filename with date, time including seconds (24h format), and short hash
+    return f"{date.strftime('%Y-%m-%d_%H-%M-%S')}_{file_hash}.pdf"
 
 
 def get_year_month_folder(date: Optional[datetime] = None) -> str:
