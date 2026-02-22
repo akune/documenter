@@ -154,8 +154,8 @@ def import_documents(
         # Title is the filename without extension
         title = file_path.stem
         
-        # Build custom field context with relative directory path
-        custom_field_context = {
+        # Build tag context for variable resolution
+        tag_context = {
             'directory_path': relative_dir if relative_dir else year_month,
             'year_month': year_month,
         }
@@ -164,9 +164,9 @@ def import_documents(
             logger.info(f"[DRY-RUN] Would upload: {file_path.name}")
             logger.info(f"  Title: {title}")
             logger.info(f"  Tags: {tags}")
+            logger.info(f"  Context: directory_path={tag_context['directory_path']}")
             if created_date:
                 logger.info(f"  Created: {created_date.strftime('%Y-%m-%d %H:%M:%S')}")
-            logger.info(f"  Directory path: {custom_field_context['directory_path']}")
             success_count += 1
         else:
             logger.info(f"Uploading: {file_path.name}")
@@ -175,7 +175,7 @@ def import_documents(
                 title, 
                 tags, 
                 created_date,
-                custom_field_context=custom_field_context
+                tag_context=tag_context
             )
             
             if success:
@@ -197,11 +197,11 @@ Examples:
   %(prog)s /path/to/documents
   %(prog)s /path/to/documents --dry-run
   %(prog)s /path/to/documents --tags Archive --tags Important
-  %(prog)s /path/to/documents --custom-field "Physical Location=${directory_path}"
+  %(prog)s /path/to/documents --tags 'Cabinet-${directory_path}'
   %(prog)s /path/to/documents --env /path/to/.env
 
-Custom Field Variables:
-  ${directory_path}  - Relative path from search directory
+Tag Variables:
+  ${directory_path}  - Relative path from search directory (or year_month if empty)
   ${year_month}      - Year and month from document (YYYY-MM)
   ${filename}        - Document filename
   ${title}           - Document title
@@ -209,8 +209,7 @@ Custom Field Variables:
 Environment variables (can be set in .env file):
   PAPERLESS_URL           - Paperless-ngx server URL
   PAPERLESS_API_TOKEN     - API token for authentication
-  PAPERLESS_DEFAULT_TAGS  - Default tags (comma-separated)
-  PAPERLESS_CUSTOM_FIELDS - Custom fields as JSON (merged with --custom-field args)
+  PAPERLESS_DEFAULT_TAGS  - Default tags (comma-separated, supports variables)
 """
     )
     
@@ -221,7 +220,7 @@ Environment variables (can be set in .env file):
     )
     
     parser.add_argument(
-        '--dry-run', '-n',
+        '--dry-run', '-d',
         action='store_true',
         help='Show what would be uploaded without actually uploading'
     )
@@ -231,15 +230,6 @@ Environment variables (can be set in .env file):
         action='append',
         default=[],
         help='Additional tags to apply (can be specified multiple times)'
-    )
-    
-    parser.add_argument(
-        '--custom-field', '-c',
-        action='append',
-        default=[],
-        metavar='NAME=VALUE',
-        help='Set custom field value (can be specified multiple times). '
-             'Format: "Field Name=value with ${variables}"'
     )
     
     parser.add_argument(
@@ -298,22 +288,6 @@ Environment variables (can be set in .env file):
     
     # Create config and uploader
     config = Config()
-    
-    # Parse and merge custom fields from command line arguments
-    if args.custom_field:
-        for field_arg in args.custom_field:
-            if '=' in field_arg:
-                name, _, value = field_arg.partition('=')
-                name = name.strip()
-                value = value.strip()
-                if name:
-                    config.paperless_custom_fields[name] = value
-                    logger.debug(f"Added custom field from argument: {name}={value}")
-            else:
-                logger.warning(f"Invalid custom field format (expected NAME=VALUE): {field_arg}")
-    
-    if config.paperless_custom_fields:
-        logger.info(f"Custom fields configured: {list(config.paperless_custom_fields.keys())}")
     
     # Validate Paperless configuration
     if not config.paperless_url:

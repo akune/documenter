@@ -93,7 +93,18 @@ All settings are controlled via environment variables:
 | `PAPERLESS_ENABLED` | `true` | Enable upload |
 | `PAPERLESS_URL` | - | Server URL |
 | `PAPERLESS_API_TOKEN` | - | API token |
-| `PAPERLESS_DEFAULT_TAGS` | `Inbox` | Default tags (comma-separated) |
+| `PAPERLESS_DEFAULT_TAGS` | `Inbox` | Default tags (comma-separated, supports variables) |
+
+**Tag Variables:** Tags can include variables that are resolved at upload time:
+
+| Variable | Description |
+|----------|-------------|
+| `${directory_path}` | Relative directory path (import) or YYYY-MM (processing) |
+| `${year_month}` | Year and month from document (YYYY-MM) |
+| `${filename}` | Document filename |
+| `${title}` | Document title |
+
+Example: `PAPERLESS_DEFAULT_TAGS=Inbox,Cabinet-${directory_path}`
 
 ### Output Directory
 
@@ -143,6 +154,7 @@ documenter/
     ├── nextcloud_uploader.py   # Nextcloud WebDAV
     ├── paperless_uploader.py   # Paperless-ngx API
     ├── paperless_import.py     # CLI tool for importing existing documents
+    ├── template_resolver.py    # Variable substitution for tags
     └── utils.py                # Utility functions
 ```
 
@@ -168,6 +180,9 @@ It searches for files matching the pattern `YYYY-MM-DD_hh-mm-ss_HASH.pdf` and up
 
 # With additional tags
 ./paperless-import.sh ~/Documents/Scans --tags Archive --verbose
+
+# With dynamic tags using variables
+./paperless-import.sh ~/Documents/Archive/2023 -t 'Cabinet-${directory_path}'
 ```
 
 ### Using Docker Directly
@@ -180,8 +195,8 @@ docker compose run --rm documenter python3 /app/src/paperless_import.py /documen
 
 | Option | Description |
 |--------|-------------|
-| `--dry-run`, `-n` | Show what would be uploaded without uploading |
-| `--tags`, `-t` | Additional tags (can be used multiple times) |
+| `--dry-run`, `-d` | Show what would be uploaded without uploading |
+| `--tags`, `-t` | Additional tags (can be used multiple times, supports variables) |
 | `--no-recursive`, `-R` | Do not search subdirectories |
 | `--verbose`, `-v` | Enable verbose output |
 
