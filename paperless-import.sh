@@ -6,18 +6,17 @@
 #   ./paperless-import.sh /path/to/documents [options]
 #
 # Options are passed through to paperless_import.py:
-#   --dry-run, -n       Show what would be uploaded without actually uploading
-#   --tags, -t TAGS     Additional tags to apply (can be specified multiple times)
-#   --no-recursive, -R  Do not search subdirectories
-#   --verbose, -v       Enable verbose output
+#   --dry-run, -n              Show what would be uploaded without actually uploading
+#   --tags, -t TAGS            Additional tags to apply (can be specified multiple times)
+#   --custom-field, -c NAME=VALUE  Set custom field (can be specified multiple times)
+#   --no-recursive, -R         Do not search subdirectories
+#   --verbose, -v              Enable verbose output
 #
-# Custom Fields:
-#   Configure PAPERLESS_CUSTOM_FIELDS in .env to set custom field values.
-#   The ${directory_path} variable resolves to the relative path from the
-#   base search directory.
-#
-#   Example .env:
-#     PAPERLESS_CUSTOM_FIELDS={"Physical Location": "${directory_path}"}
+# Custom Field Variables:
+#   ${directory_path}  - Relative path from search directory
+#   ${year_month}      - Year and month from document (YYYY-MM)
+#   ${filename}        - Document filename
+#   ${title}           - Document title
 #
 
 set -e
@@ -41,29 +40,31 @@ usage() {
     echo "  path-to-documents    Local path to search for PDF documents"
     echo ""
     echo "Options (passed to paperless_import.py):"
-    echo "  --dry-run, -n        Show what would be uploaded without uploading"
-    echo "  --tags, -t TAGS      Additional tags (can be used multiple times)"
-    echo "  --no-recursive, -R   Do not search subdirectories"
-    echo "  --verbose, -v        Enable verbose output"
+    echo "  --dry-run, -n              Show what would be uploaded without uploading"
+    echo "  --tags, -t TAGS            Additional tags (can be used multiple times)"
+    echo "  --custom-field, -c NAME=VALUE"
+    echo "                             Set custom field value (can be used multiple times)"
+    echo "  --no-recursive, -R         Do not search subdirectories"
+    echo "  --verbose, -v              Enable verbose output"
     echo ""
     echo "Examples:"
     echo "  $0 ~/Documents/Scans --dry-run"
     echo "  $0 ~/Documents/Scans --tags Archive --verbose"
+    echo "  $0 ~/Documents/Scans -c 'Physical Location=\${directory_path}'"
+    echo "  $0 ~/Documents/Scans --custom-field 'Cabinet=Filing Cabinet A'"
+    echo ""
+    echo "Custom Field Variables:"
+    echo "  \${directory_path}  Relative path from search directory"
+    echo "  \${year_month}      Year and month from document (YYYY-MM)"
+    echo "  \${filename}        Document filename"
+    echo "  \${title}           Document title"
     echo ""
     echo "Configuration:"
     echo "  The script uses ${ENV_FILE} for Paperless-ngx credentials."
     echo "  Required variables: PAPERLESS_URL, PAPERLESS_API_TOKEN"
     echo ""
-    echo "Custom Fields:"
-    echo "  Set PAPERLESS_CUSTOM_FIELDS in .env to configure custom fields."
-    echo "  Available variables:"
-    echo "    \${directory_path}  Relative path from search directory"
-    echo "    \${year_month}      Year and month from document (YYYY-MM)"
-    echo "    \${filename}        Document filename"
-    echo "    \${title}           Document title"
-    echo ""
-    echo "  Example:"
-    echo "    PAPERLESS_CUSTOM_FIELDS={\"Physical Location\": \"\${directory_path}\"}"
+    echo "  Custom fields can also be set in .env via PAPERLESS_CUSTOM_FIELDS."
+    echo "  Command-line arguments are merged with (and override) .env settings."
     exit 1
 }
 

@@ -197,12 +197,20 @@ Examples:
   %(prog)s /path/to/documents
   %(prog)s /path/to/documents --dry-run
   %(prog)s /path/to/documents --tags Archive --tags Important
+  %(prog)s /path/to/documents --custom-field "Physical Location=${directory_path}"
   %(prog)s /path/to/documents --env /path/to/.env
 
+Custom Field Variables:
+  ${directory_path}  - Relative path from search directory
+  ${year_month}      - Year and month from document (YYYY-MM)
+  ${filename}        - Document filename
+  ${title}           - Document title
+
 Environment variables (can be set in .env file):
-  PAPERLESS_URL         - Paperless-ngx server URL
-  PAPERLESS_API_TOKEN   - API token for authentication
-  PAPERLESS_DEFAULT_TAGS - Default tags (comma-separated)
+  PAPERLESS_URL           - Paperless-ngx server URL
+  PAPERLESS_API_TOKEN     - API token for authentication
+  PAPERLESS_DEFAULT_TAGS  - Default tags (comma-separated)
+  PAPERLESS_CUSTOM_FIELDS - Custom fields as JSON (merged with --custom-field args)
 """
     )
     
@@ -223,6 +231,15 @@ Environment variables (can be set in .env file):
         action='append',
         default=[],
         help='Additional tags to apply (can be specified multiple times)'
+    )
+    
+    parser.add_argument(
+        '--custom-field', '-c',
+        action='append',
+        default=[],
+        metavar='NAME=VALUE',
+        help='Set custom field value (can be specified multiple times). '
+             'Format: "Field Name=value with ${variables}"'
     )
     
     parser.add_argument(
@@ -281,6 +298,22 @@ Environment variables (can be set in .env file):
     
     # Create config and uploader
     config = Config()
+    
+    # Parse and merge custom fields from command line arguments
+    if args.custom_field:
+        for field_arg in args.custom_field:
+            if '=' in field_arg:
+                name, _, value = field_arg.partition('=')
+                name = name.strip()
+                value = value.strip()
+                if name:
+                    config.paperless_custom_fields[name] = value
+                    logger.debug(f"Added custom field from argument: {name}={value}")
+            else:
+                logger.warning(f"Invalid custom field format (expected NAME=VALUE): {field_arg}")
+    
+    if config.paperless_custom_fields:
+        logger.info(f"Custom fields configured: {list(config.paperless_custom_fields.keys())}")
     
     # Validate Paperless configuration
     if not config.paperless_url:
