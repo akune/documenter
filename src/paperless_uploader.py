@@ -187,7 +187,7 @@ class PaperlessUploader:
                 
                 # Add created date if available (format: YYYY-MM-DD)
                 if created_date:
-                    logger.info(f"Setting created date to {created_date.strftime('%Y-%m-%d')}")
+                    logger.debug(f"Setting created date to {created_date.strftime('%Y-%m-%d')}")
                     data_items.append(('created', created_date.strftime('%Y-%m-%d')))
                     data_items.append(('override_created_date', 'false'))
                 

@@ -337,18 +337,23 @@ class PDFProcessor:
             # Parse language string into list (e.g., "deu+eng" -> ["deu", "eng"])
             languages = self.config.ocr_language.split('+')
             
-            # Run OCRmyPDF using legacy API (positional arguments)
-            # This is compatible with both old and new versions
+            # Build OCR options
+            ocr_options = {
+                'language': languages,
+                'deskew': self.config.ocr_deskew,
+                'clean': self.config.ocr_clean,
+                'rotate_pages': self.config.ocr_rotate_pages,
+                'rotate_pages_threshold': self.config.ocr_rotate_pages_threshold * 100,
+                'force_ocr': True,  # Redo OCR even if text layer exists
+                'optimize': 1,  # Basic optimization
+                'progress_bar': False,
+            }
+
+            # Run OCRmyPDF
             result = ocrmypdf.ocr(
                 input_path,
                 output_path,
-                language=languages,
-                deskew=self.config.ocr_deskew,
-                clean=self.config.ocr_clean,
-                rotate_pages=self.config.ocr_rotate_pages,
-                skip_text=True,  # Skip pages that already have text
-                optimize=1,  # Basic optimization
-                progress_bar=False,
+                **ocr_options
             )
             
             if result == ocrmypdf.ExitCode.ok:

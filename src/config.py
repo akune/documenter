@@ -21,6 +21,7 @@ class Config:
     ocr_deskew: bool = field(default_factory=lambda: os.getenv("OCR_DESKEW", "true").lower() == "true")
     ocr_clean: bool = field(default_factory=lambda: os.getenv("OCR_CLEAN", "true").lower() == "true")
     ocr_rotate_pages: bool = field(default_factory=lambda: os.getenv("OCR_ROTATE_PAGES", "true").lower() == "true")
+    ocr_rotate_pages_threshold: float = field(default_factory=lambda: float(os.getenv("OCR_ROTATE_PAGES_THRESHOLD", "1.0")))
     
     # Blank page detection
     blank_page_threshold: float = field(default_factory=lambda: float(os.getenv("BLANK_PAGE_THRESHOLD", "0.99")))
@@ -90,6 +91,7 @@ class Config:
             f"  ocr_deskew={self.ocr_deskew}\n"
             f"  ocr_clean={self.ocr_clean}\n"
             f"  ocr_rotate_pages={self.ocr_rotate_pages}\n"
+            f"  ocr_rotate_pages_threshold={self.ocr_rotate_pages_threshold}\n"
             f"  blank_page_removal={self.blank_page_removal}\n"
             f"  blank_page_threshold={self.blank_page_threshold}\n"
             f"  split_qr_enabled={self.split_qr_enabled}\n"
