@@ -187,7 +187,9 @@ class PaperlessUploader:
                 
                 # Add created date if available (format: YYYY-MM-DD)
                 if created_date:
+                    logger.info(f"Setting created date to {created_date.strftime('%Y-%m-%d')}")
                     data_items.append(('created', created_date.strftime('%Y-%m-%d')))
+                    data_items.append(('override_created_date', 'false'))
                 
                 # Add tags (paperless-ngx accepts multiple 'tags' fields)
                 for tag_id in tag_ids:

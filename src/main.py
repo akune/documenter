@@ -248,7 +248,8 @@ class DocumentProcessor:
                         success, error = self.paperless_uploader.upload(
                             ocr_output_path,
                             new_filename,
-                            additional_tags=additional_tags
+                            additional_tags=additional_tags, 
+                            created_date=file_date
                         )
                         if not success:
                             logger.error(f"Paperless-ngx upload failed for {new_filename}: {error}")
