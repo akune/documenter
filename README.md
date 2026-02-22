@@ -10,7 +10,7 @@ A Docker-based service for automatic processing of scanned PDF documents.
 - **Automatic orientation detection** and correction
 - **OCR** - Text recognition with invisible text layer
 - **QR code based document splitting** - Automatic splitting at separator pages
-- **Automatic renaming** to `YYYY-MM-DD_hh-mm_HASH.pdf` format
+- **Automatic renaming** to `YYYY-MM-DD_hh-mm-ss_HASH.pdf` format
 - **Nextcloud upload** via WebDAV into `YYYY-MM` subfolders
 - **Paperless-ngx upload** with configurable tags
 - **Local output directory** (optional) for processed documents
@@ -44,7 +44,7 @@ Simply place PDF files in the `./input` folder. They will automatically be:
 2. Cleared of blank pages
 3. OCR processed with text layer
 4. Split at QR code separator pages
-5. Renamed to `YYYY-MM-DD_hh-mm_<MD5>.pdf`
+6. Renamed to `YYYY-MM-DD_hh-mm-ss_<MD5>.pdf`
 6. Uploaded to Nextcloud (subfolder `YYYY-MM`)
 7. Sent to Paperless-ngx (tags: `Inbox`, `YYYY-MM`)
 8. Deleted from input folder
@@ -132,8 +132,9 @@ documenter/
 ├── docker-compose.yml
 ├── requirements.txt
 ├── .env.example
-├── input/              # Place PDFs here
-├── output/             # Processed PDFs (optional)
+├── paperless-import.sh         # CLI wrapper for importing existing documents
+├── input/                      # Place PDFs here
+├── output/                     # Processed PDFs (optional)
 └── src/
     ├── main.py                 # Watchdog-based directory monitoring
     ├── config.py               # Configuration
@@ -141,6 +142,7 @@ documenter/
     ├── document_splitter.py    # QR code based document splitting
     ├── nextcloud_uploader.py   # Nextcloud WebDAV
     ├── paperless_uploader.py   # Paperless-ngx API
+    ├── paperless_import.py     # CLI tool for importing existing documents
     └── utils.py                # Utility functions
 ```
 
@@ -149,6 +151,39 @@ documenter/
 ```bash
 docker compose logs -f documenter
 ```
+
+## Importing Existing Documents
+
+You can import already-processed documents to Paperless-ngx using the import tool.
+It searches for files matching the pattern `YYYY-MM-DD_hh-mm-ss_HASH.pdf` and uploads them with appropriate tags.
+
+### Using the Bash Wrapper (Recommended)
+
+```bash
+# Dry-run (shows what would be uploaded)
+./paperless-import.sh ~/Documents/Scans --dry-run
+
+# Import documents
+./paperless-import.sh ~/Documents/Scans
+
+# With additional tags
+./paperless-import.sh ~/Documents/Scans --tags Archive --verbose
+```
+
+### Using Docker Directly
+
+```bash
+docker compose run --rm documenter python3 /app/src/paperless_import.py /documents --dry-run
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--dry-run`, `-n` | Show what would be uploaded without uploading |
+| `--tags`, `-t` | Additional tags (can be used multiple times) |
+| `--no-recursive`, `-R` | Do not search subdirectories |
+| `--verbose`, `-v` | Enable verbose output |
 
 ## Troubleshooting
 
