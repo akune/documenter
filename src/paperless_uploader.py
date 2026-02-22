@@ -171,10 +171,11 @@ class PaperlessUploader:
                 if 'year_month' not in context:
                     context['year_month'] = created_date.strftime('%Y-%m')
             
-            # Combine default tags with additional tags and resolve variables
-            all_tag_templates = list(self.config.paperless_default_tags)
+            # Use additional_tags if provided, otherwise use default tags from config
             if additional_tags:
-                all_tag_templates.extend(additional_tags)
+                all_tag_templates = list(additional_tags)
+            else:
+                all_tag_templates = list(self.config.paperless_default_tags)
             
             # Resolve variables in tag names
             resolved_tags = []
