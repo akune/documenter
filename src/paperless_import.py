@@ -79,7 +79,7 @@ def setup_logging(verbose: bool) -> None:
     )
 
 
-def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path, str, Optional[datetime]]]:
+def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path, str, Optional[datetime], str]]:
     """
     Find all documents matching the filename pattern.
     
@@ -88,7 +88,7 @@ def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path
         recursive: Whether to search subdirectories
     
     Returns:
-        List of (file_path, year_month, created_date) tuples
+        List of (file_path, year_month, created_date, relative_dir) tuples
     """
     documents = []
     
@@ -104,7 +104,16 @@ def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path
             month = match.group(2)
             year_month = f"{year}-{month}"
             created_date = extract_datetime_from_filename(pdf_path.name)
-            documents.append((pdf_path, year_month, created_date))
+            
+            # Calculate relative directory path from search_path
+            try:
+                relative_dir = str(pdf_path.parent.relative_to(search_path))
+                if relative_dir == '.':
+                    relative_dir = ''
+            except ValueError:
+                relative_dir = ''
+            
+            documents.append((pdf_path, year_month, created_date, relative_dir))
     
     # Sort by filename for consistent processing
     documents.sort(key=lambda x: x[0].name)
@@ -113,8 +122,9 @@ def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path
 
 
 def import_documents(
-    documents: List[Tuple[Path, str, Optional[datetime]]],
+    documents: List[Tuple[Path, str, Optional[datetime], str]],
     uploader: PaperlessUploader,
+    base_path: Path,
     extra_tags: Optional[List[str]] = None,
     dry_run: bool = False
 ) -> Tuple[int, int]:
@@ -122,8 +132,9 @@ def import_documents(
     Import documents to Paperless-ngx.
     
     Args:
-        documents: List of (file_path, year_month, created_date) tuples
+        documents: List of (file_path, year_month, created_date, relative_dir) tuples
         uploader: PaperlessUploader instance
+        base_path: Base path for calculating relative directory
         extra_tags: Additional tags to apply
         dry_run: If True, don't actually upload
     
@@ -134,7 +145,7 @@ def import_documents(
     success_count = 0
     error_count = 0
     
-    for file_path, year_month, created_date in documents:
+    for file_path, year_month, created_date, relative_dir in documents:
         # Build tags: year-month tag + any extra tags
         tags = [year_month]
         if extra_tags:
@@ -143,16 +154,29 @@ def import_documents(
         # Title is the filename without extension
         title = file_path.stem
         
+        # Build custom field context with relative directory path
+        custom_field_context = {
+            'directory_path': relative_dir if relative_dir else year_month,
+            'year_month': year_month,
+        }
+        
         if dry_run:
             logger.info(f"[DRY-RUN] Would upload: {file_path.name}")
             logger.info(f"  Title: {title}")
             logger.info(f"  Tags: {tags}")
             if created_date:
                 logger.info(f"  Created: {created_date.strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info(f"  Directory path: {custom_field_context['directory_path']}")
             success_count += 1
         else:
             logger.info(f"Uploading: {file_path.name}")
-            success, error = uploader.upload(str(file_path), title, tags, created_date)
+            success, error = uploader.upload(
+                str(file_path), 
+                title, 
+                tags, 
+                created_date,
+                custom_field_context=custom_field_context
+            )
             
             if success:
                 logger.info(f"  ✓ Uploaded successfully")
@@ -283,6 +307,7 @@ Environment variables (can be set in .env file):
     success, errors = import_documents(
         documents,
         uploader,
+        base_path=search_path,
         extra_tags=args.tags if args.tags else None,
         dry_run=args.dry_run
     )

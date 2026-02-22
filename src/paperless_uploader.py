@@ -8,11 +8,12 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
 from config import Config
+from template_resolver import resolve_template
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ class PaperlessUploader:
         }
         self.timeout = 120  # 2 minutes timeout for large files
         self._tag_cache: Dict[str, int] = {}  # Cache tag name -> ID mappings
+        self._custom_field_cache: Dict[str, int] = {}  # Cache custom field name -> ID mappings
     
     def _get_tag_id(self, tag_name: str) -> Optional[int]:
         """
@@ -111,6 +113,88 @@ class PaperlessUploader:
             logger.error(f"Error getting/creating tag '{tag_name}': {e}")
             return None
     
+    def _get_custom_field_id(self, field_name: str) -> Optional[int]:
+        """
+        Get custom field ID by name, creating the field if it doesn't exist.
+        
+        Args:
+            field_name: Name of the custom field
+        
+        Returns:
+            Custom field ID or None on error
+        """
+        # Check cache first
+        if field_name in self._custom_field_cache:
+            return self._custom_field_cache[field_name]
+        
+        try:
+            # Search for existing custom field
+            response = requests.get(
+                f"{self.base_url}/api/custom_fields/",
+                headers=self.headers,
+                params={'name__iexact': field_name},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                results = response.json().get('results', [])
+                if results:
+                    field_id = results[0]['id']
+                    self._custom_field_cache[field_name] = field_id
+                    logger.debug(f"Found existing custom field '{field_name}' with ID {field_id}")
+                    return field_id
+            
+            # Custom field doesn't exist, create it (as text type)
+            response = requests.post(
+                f"{self.base_url}/api/custom_fields/",
+                headers={**self.headers, 'Content-Type': 'application/json'},
+                json={
+                    'name': field_name,
+                    'data_type': 'string'  # Text field
+                },
+                timeout=30
+            )
+            
+            if response.status_code in [200, 201]:
+                field_id = response.json()['id']
+                self._custom_field_cache[field_name] = field_id
+                logger.info(f"Created new custom field '{field_name}' with ID {field_id}")
+                return field_id
+            else:
+                logger.error(f"Failed to create custom field '{field_name}': {response.status_code} {response.text}")
+                return None
+        
+        except requests.RequestException as e:
+            logger.error(f"Error getting/creating custom field '{field_name}': {e}")
+            return None
+    
+    def _resolve_custom_fields(
+        self,
+        field_templates: Dict[str, str],
+        context: Dict[str, Any]
+    ) -> List[Tuple[int, str]]:
+        """
+        Resolve custom field templates to (field_id, value) tuples.
+        
+        Args:
+            field_templates: Dictionary of field names to value templates
+            context: Context for variable resolution
+        
+        Returns:
+            List of (field_id, resolved_value) tuples
+        """
+        resolved = []
+        
+        for field_name, value_template in field_templates.items():
+            field_id = self._get_custom_field_id(field_name)
+            if field_id is not None:
+                # Resolve variables in the value template
+                resolved_value = resolve_template(value_template, context)
+                resolved.append((field_id, resolved_value))
+                logger.debug(f"Resolved custom field '{field_name}' = '{resolved_value}'")
+        
+        return resolved
+    
     def _resolve_tags(self, tag_names: List[str]) -> List[int]:
         """
         Resolve tag names to IDs, creating tags if necessary.
@@ -133,7 +217,8 @@ class PaperlessUploader:
         local_path: str,
         title: str,
         additional_tags: Optional[List[str]] = None,
-        created_date: Optional[datetime] = None
+        created_date: Optional[datetime] = None,
+        custom_field_context: Optional[Dict[str, Any]] = None
     ) -> Tuple[bool, Optional[str]]:
         """
         Upload a document to Paperless-ngx.
@@ -143,6 +228,8 @@ class PaperlessUploader:
             title: Document title
             additional_tags: Additional tags beyond the default ones
             created_date: Document creation date (extracted from filename if not provided)
+            custom_field_context: Context for resolving custom field templates
+                                  (e.g., {'directory_path': '2024-01', 'year_month': '2024-01'})
         
         Returns:
             Tuple of (success, error_message)
@@ -176,6 +263,25 @@ class PaperlessUploader:
             tag_ids = self._resolve_tags(unique_tags)
             logger.debug(f"Resolved tags: {dict(zip(unique_tags, tag_ids))}")
             
+            # Resolve custom fields if configured
+            custom_fields = []
+            if self.config.paperless_custom_fields:
+                # Build context for template resolution
+                context = custom_field_context.copy() if custom_field_context else {}
+                context['filename'] = Path(local_path).name
+                context['title'] = title
+                if created_date:
+                    context['created_date'] = created_date
+                    if 'year_month' not in context:
+                        context['year_month'] = created_date.strftime('%Y-%m')
+                
+                custom_fields = self._resolve_custom_fields(
+                    self.config.paperless_custom_fields,
+                    context
+                )
+                if custom_fields:
+                    logger.info(f"  Custom fields: {len(custom_fields)}")
+            
             # Prepare upload
             url = f"{self.base_url}/api/documents/post_document/"
             
@@ -189,11 +295,15 @@ class PaperlessUploader:
                 if created_date:
                     logger.debug(f"Setting created date to {created_date.strftime('%Y-%m-%d')}")
                     data_items.append(('created', created_date.strftime('%Y-%m-%d')))
-                    data_items.append(('override_created_date', 'false'))
+                    data_items.append(('override_created_date', 'true'))
                 
                 # Add tags (paperless-ngx accepts multiple 'tags' fields)
                 for tag_id in tag_ids:
                     data_items.append(('tags', str(tag_id)))
+                
+                # Add custom fields (format: custom_fields:[field_id] = value)
+                for field_id, value in custom_fields:
+                    data_items.append((f'custom_fields:{field_id}', value))
                 
                 response = requests.post(
                     url,

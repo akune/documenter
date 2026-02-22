@@ -3,9 +3,32 @@ Configuration module for the document processor.
 Loads settings from environment variables.
 """
 
+import json
 import os
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
+
+
+def _parse_custom_fields(value: str) -> Dict[str, str]:
+    """
+    Parse custom fields from JSON string.
+    
+    Args:
+        value: JSON string like '{"Field Name": "value with ${variables}"}'
+    
+    Returns:
+        Dictionary of field names to value templates
+    """
+    if not value or not value.strip():
+        return {}
+    
+    try:
+        result = json.loads(value)
+        if isinstance(result, dict):
+            return {str(k): str(v) for k, v in result.items()}
+        return {}
+    except json.JSONDecodeError:
+        return {}
 
 
 @dataclass
@@ -45,6 +68,10 @@ class Config:
     paperless_default_tags: List[str] = field(default_factory=lambda: [
         tag.strip() for tag in os.getenv("PAPERLESS_DEFAULT_TAGS", "Inbox").split(",") if tag.strip()
     ])
+    # Custom fields for Paperless-ngx (JSON format: {"Field Name": "value with ${variables}"})
+    paperless_custom_fields: Dict[str, str] = field(default_factory=lambda: _parse_custom_fields(
+        os.getenv("PAPERLESS_CUSTOM_FIELDS", "")
+    ))
     
     # Processing settings
     delete_source: bool = field(default_factory=lambda: os.getenv("DELETE_SOURCE", "true").lower() == "true")

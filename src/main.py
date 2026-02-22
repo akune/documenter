@@ -245,11 +245,17 @@ class DocumentProcessor:
                     if self.paperless_uploader:
                         # Add YYYY-MM tag
                         additional_tags = [year_month]
+                        # Custom field context - use year_month as directory_path for processed documents
+                        custom_field_context = {
+                            'directory_path': year_month,
+                            'year_month': year_month,
+                        }
                         success, error = self.paperless_uploader.upload(
                             ocr_output_path,
                             new_filename,
                             additional_tags=additional_tags, 
-                            created_date=file_date
+                            created_date=file_date,
+                            custom_field_context=custom_field_context
                         )
                         if not success:
                             logger.error(f"Paperless-ngx upload failed for {new_filename}: {error}")
