@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -46,6 +47,28 @@ FILENAME_PATTERN = re.compile(
 )
 
 
+def extract_datetime_from_filename(filename: str) -> Optional[datetime]:
+    """
+    Extract datetime from a filename matching the pattern YYYY-MM-DD_hh-mm(-ss)?_HASH.pdf.
+    
+    Args:
+        filename: The filename to parse
+    
+    Returns:
+        datetime object if pattern matches, None otherwise
+    """
+    match = FILENAME_PATTERN.match(filename)
+    if match:
+        year = int(match.group(1))
+        month = int(match.group(2))
+        day = int(match.group(3))
+        hour = int(match.group(4))
+        minute = int(match.group(5))
+        second = int(match.group(6)) if match.group(6) else 0
+        return datetime(year, month, day, hour, minute, second)
+    return None
+
+
 def setup_logging(verbose: bool) -> None:
     """Configure logging based on verbosity."""
     level = logging.DEBUG if verbose else logging.INFO
@@ -56,7 +79,7 @@ def setup_logging(verbose: bool) -> None:
     )
 
 
-def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path, str]]:
+def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path, str, Optional[datetime]]]:
     """
     Find all documents matching the filename pattern.
     
@@ -65,7 +88,7 @@ def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path
         recursive: Whether to search subdirectories
     
     Returns:
-        List of (file_path, year_month) tuples
+        List of (file_path, year_month, created_date) tuples
     """
     documents = []
     
@@ -80,7 +103,8 @@ def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path
             year = match.group(1)
             month = match.group(2)
             year_month = f"{year}-{month}"
-            documents.append((pdf_path, year_month))
+            created_date = extract_datetime_from_filename(pdf_path.name)
+            documents.append((pdf_path, year_month, created_date))
     
     # Sort by filename for consistent processing
     documents.sort(key=lambda x: x[0].name)
@@ -89,7 +113,7 @@ def find_documents(search_path: Path, recursive: bool = True) -> List[Tuple[Path
 
 
 def import_documents(
-    documents: List[Tuple[Path, str]],
+    documents: List[Tuple[Path, str, Optional[datetime]]],
     uploader: PaperlessUploader,
     extra_tags: Optional[List[str]] = None,
     dry_run: bool = False
@@ -98,7 +122,7 @@ def import_documents(
     Import documents to Paperless-ngx.
     
     Args:
-        documents: List of (file_path, year_month) tuples
+        documents: List of (file_path, year_month, created_date) tuples
         uploader: PaperlessUploader instance
         extra_tags: Additional tags to apply
         dry_run: If True, don't actually upload
@@ -110,7 +134,7 @@ def import_documents(
     success_count = 0
     error_count = 0
     
-    for file_path, year_month in documents:
+    for file_path, year_month, created_date in documents:
         # Build tags: year-month tag + any extra tags
         tags = [year_month]
         if extra_tags:
@@ -123,10 +147,12 @@ def import_documents(
             logger.info(f"[DRY-RUN] Would upload: {file_path.name}")
             logger.info(f"  Title: {title}")
             logger.info(f"  Tags: {tags}")
+            if created_date:
+                logger.info(f"  Created: {created_date.strftime('%Y-%m-%d %H:%M:%S')}")
             success_count += 1
         else:
             logger.info(f"Uploading: {file_path.name}")
-            success, error = uploader.upload(str(file_path), title, tags)
+            success, error = uploader.upload(str(file_path), title, tags, created_date)
             
             if success:
                 logger.info(f"  ✓ Uploaded successfully")

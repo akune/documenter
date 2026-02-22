@@ -4,7 +4,10 @@ Uploads documents to Paperless-ngx via REST API.
 """
 
 import logging
+import re
 import time
+from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import requests
@@ -12,6 +15,35 @@ import requests
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+# Regex pattern for document filenames
+# Matches: YYYY-MM-DD_hh-mm-ss_HASH.pdf or YYYY-MM-DD_hh-mm_HASH.pdf
+FILENAME_PATTERN = re.compile(
+    r'^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})(?:-(\d{2}))?_([a-f0-9]{8})\.pdf$',
+    re.IGNORECASE
+)
+
+
+def extract_date_from_filename(filename: str) -> Optional[datetime]:
+    """
+    Extract datetime from a filename matching the pattern YYYY-MM-DD_hh-mm(-ss)?_HASH.pdf.
+    
+    Args:
+        filename: The filename to parse
+    
+    Returns:
+        datetime object if pattern matches, None otherwise
+    """
+    match = FILENAME_PATTERN.match(filename)
+    if match:
+        year = int(match.group(1))
+        month = int(match.group(2))
+        day = int(match.group(3))
+        hour = int(match.group(4))
+        minute = int(match.group(5))
+        second = int(match.group(6)) if match.group(6) else 0
+        return datetime(year, month, day, hour, minute, second)
+    return None
 
 
 class PaperlessUploader:
@@ -96,7 +128,13 @@ class PaperlessUploader:
                 tag_ids.append(tag_id)
         return tag_ids
     
-    def upload(self, local_path: str, title: str, additional_tags: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
+    def upload(
+        self,
+        local_path: str,
+        title: str,
+        additional_tags: Optional[List[str]] = None,
+        created_date: Optional[datetime] = None
+    ) -> Tuple[bool, Optional[str]]:
         """
         Upload a document to Paperless-ngx.
         
@@ -104,11 +142,21 @@ class PaperlessUploader:
             local_path: Path to local file
             title: Document title
             additional_tags: Additional tags beyond the default ones
+            created_date: Document creation date (extracted from filename if not provided)
         
         Returns:
             Tuple of (success, error_message)
         """
+        # Extract date from filename if not provided
+        if created_date is None:
+            filename = Path(local_path).name
+            created_date = extract_date_from_filename(filename)
+            if created_date:
+                logger.debug(f"Extracted date from filename: {created_date}")
+        
         logger.info(f"Uploading to Paperless-ngx: {title}")
+        if created_date:
+            logger.info(f"  Created date: {created_date.strftime('%Y-%m-%d %H:%M:%S')}")
         
         try:
             # Combine default tags with additional tags
@@ -133,11 +181,15 @@ class PaperlessUploader:
             
             with open(local_path, 'rb') as f:
                 files = {'document': (title, f, 'application/pdf')}
-                data = {'title': title}
+                
+                # Build data items as list of tuples to allow multiple values with same key
+                data_items = [('title', title)]
+                
+                # Add created date if available (format: YYYY-MM-DD)
+                if created_date:
+                    data_items.append(('created', created_date.strftime('%Y-%m-%d')))
                 
                 # Add tags (paperless-ngx accepts multiple 'tags' fields)
-                # Using a list of tuples to allow multiple values with same key
-                data_items = [('title', title)]
                 for tag_id in tag_ids:
                     data_items.append(('tags', str(tag_id)))
                 
