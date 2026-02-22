@@ -86,7 +86,7 @@ class DocumentSplitter:
         
         # Convert PDF pages to images
         # Use higher DPI for better QR code detection
-        images = convert_from_path(pdf_path, dpi=150)
+        images = convert_from_path(pdf_path, dpi=300)
         
         split_points = []
         for i, image in enumerate(images):

@@ -171,53 +171,68 @@ class DocumentProcessor:
             file_date = datetime.fromtimestamp(file_mtime)
             year_month = get_year_month_folder(file_date)
             
-            # Create temp file for processed output
+            # Create temp file for preprocessed output (blank removal only)
             with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False, dir=self.config.temp_dir) as tmp_file:
-                temp_output_path = tmp_file.name
+                preprocessed_path = tmp_file.name
             
             # List to track all temp files for cleanup
-            temp_files_to_cleanup: List[str] = [temp_output_path]
+            temp_files_to_cleanup: List[str] = [preprocessed_path]
             
             try:
-                # Step 1-3: Process PDF (blank removal, deskew, clean, OCR)
-                success, error = self.pdf_processor.process(input_path, temp_output_path)
+                # Step 1: Preprocess PDF (blank removal only - preserves QR codes)
+                success, error = self.pdf_processor.preprocess(input_path, preprocessed_path)
                 if not success:
-                    logger.error(f"PDF processing failed: {error}")
+                    logger.error(f"PDF preprocessing failed: {error}")
                     return False
                 
-                # Step 4: Split document based on QR code markers
+                # Step 2: Split document based on QR code markers (before OCR!)
+                # This is done before OCR because OCR cleaning destroys QR codes
                 split_output_dir = os.path.join(self.config.temp_dir, "split")
                 ensure_directory(split_output_dir)
                 
-                split_files, split_error = self.document_splitter.split(temp_output_path, split_output_dir)
+                split_files, split_error = self.document_splitter.split(preprocessed_path, split_output_dir)
                 if split_error:
                     logger.warning(f"Document splitting had issues: {split_error}")
                 
                 # Track split files for cleanup (if different from original)
-                if split_files != [temp_output_path]:
+                if split_files != [preprocessed_path]:
                     temp_files_to_cleanup.extend(split_files)
                 
                 logger.info(f"Processing {len(split_files)} document(s) after splitting")
                 
-                # Process each split document
+                # Step 3: OCR each split document and upload
+                ocr_output_dir = os.path.join(self.config.temp_dir, "ocr")
+                ensure_directory(ocr_output_dir)
+                
                 all_uploads_successful = True
                 for idx, doc_path in enumerate(split_files):
-                    # Generate new filename based on processed file
-                    new_filename = generate_filename(doc_path, file_date)
+                    # Create OCR output path
+                    ocr_output_path = os.path.join(ocr_output_dir, f"ocr_{idx:03d}.pdf")
+                    temp_files_to_cleanup.append(ocr_output_path)
+                    
+                    # Run OCR on this split document
+                    success, error = self.pdf_processor.ocr_only(doc_path, ocr_output_path)
+                    if not success:
+                        logger.error(f"OCR failed for split document {idx + 1}: {error}")
+                        all_uploads_successful = False
+                        continue
+                    
+                    # Generate new filename based on OCR'd file
+                    new_filename = generate_filename(ocr_output_path, file_date)
                     logger.info(f"Document {idx + 1}/{len(split_files)}: {new_filename}")
                     
-                    # Step 5a: Write to output directory
+                    # Step 4a: Write to output directory
                     if self.config.output_dir_enabled:
-                        success, error = self._write_to_output_dir(doc_path, new_filename, year_month)
+                        success, error = self._write_to_output_dir(ocr_output_path, new_filename, year_month)
                         if not success:
                             logger.error(f"Output directory write failed for {new_filename}: {error}")
                             all_uploads_successful = False
                             continue
                     
-                    # Step 5b: Upload to Nextcloud
+                    # Step 4b: Upload to Nextcloud
                     if self.nextcloud_uploader:
                         success, error = self.nextcloud_uploader.upload(
-                            doc_path,
+                            ocr_output_path,
                             new_filename,
                             subfolder=year_month
                         )
@@ -226,12 +241,12 @@ class DocumentProcessor:
                             all_uploads_successful = False
                             continue
                     
-                    # Step 6: Upload to Paperless-ngx
+                    # Step 5: Upload to Paperless-ngx
                     if self.paperless_uploader:
                         # Add YYYY-MM tag
                         additional_tags = [year_month]
                         success, error = self.paperless_uploader.upload(
-                            doc_path,
+                            ocr_output_path,
                             new_filename,
                             additional_tags=additional_tags
                         )
@@ -246,7 +261,7 @@ class DocumentProcessor:
                     logger.error("Some uploads failed")
                     return False
                 
-                # Step 7: Delete source file
+                # Step 6: Delete source file
                 if self.config.delete_source:
                     if safe_delete(input_path):
                         logger.info(f"Deleted source file: {input_path}")
@@ -268,6 +283,14 @@ class DocumentProcessor:
                         shutil.rmtree(split_dir)
                     except Exception as e:
                         logger.warning(f"Failed to clean up split directory: {e}")
+                # Clean up OCR directory
+                ocr_dir = os.path.join(self.config.temp_dir, "ocr")
+                if os.path.isdir(ocr_dir):
+                    import shutil
+                    try:
+                        shutil.rmtree(ocr_dir)
+                    except Exception as e:
+                        logger.warning(f"Failed to clean up OCR directory: {e}")
         
         except Exception as e:
             logger.exception(f"Error processing {input_path}: {e}")

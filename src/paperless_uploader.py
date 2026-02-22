@@ -171,8 +171,10 @@ class PaperlessUploader:
             Tuple of (success, error_message)
         """
         try:
+            # Use /api/tags/ endpoint for connection test as it's more reliable
+            # The /api/ root endpoint redirects to schema which may return 406
             response = requests.get(
-                f"{self.base_url}/api/",
+                f"{self.base_url}/api/tags/",
                 headers=self.headers,
                 timeout=30
             )

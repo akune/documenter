@@ -68,9 +68,115 @@ class PDFProcessor:
             logger.error(error_msg)
             return False, error_msg
     
+    def preprocess(self, input_path: str, output_path: str) -> Tuple[bool, Optional[str]]:
+        """
+        Preprocess a PDF file: remove blank pages only (no OCR).
+        This is used before document splitting to preserve QR codes.
+        
+        Args:
+            input_path: Path to input PDF
+            output_path: Path for output PDF
+        
+        Returns:
+            Tuple of (success, error_message)
+        """
+        logger.info(f"Preprocessing PDF (blank removal only): {input_path}")
+        
+        try:
+            if self.config.blank_page_removal:
+                pages_removed = self._remove_blank_pages(input_path, output_path)
+                if pages_removed > 0:
+                    logger.info(f"Removed {pages_removed} blank page(s)")
+                elif pages_removed == 0:
+                    logger.debug("No blank pages found")
+                    # Copy original to output
+                    import shutil
+                    shutil.copy2(input_path, output_path)
+                else:
+                    logger.warning("Blank page removal failed, copying original")
+                    import shutil
+                    shutil.copy2(input_path, output_path)
+            else:
+                # No preprocessing needed, just copy
+                import shutil
+                shutil.copy2(input_path, output_path)
+            
+            return True, None
+        
+        except Exception as e:
+            error_msg = f"Failed to preprocess PDF: {e}"
+            logger.error(error_msg)
+            return False, error_msg
+    
+    def ocr_only(self, input_path: str, output_path: str) -> Tuple[bool, Optional[str]]:
+        """
+        Run OCR only (no blank page removal).
+        Used after document splitting.
+        
+        Args:
+            input_path: Path to input PDF
+            output_path: Path for output PDF
+        
+        Returns:
+            Tuple of (success, error_message)
+        """
+        logger.info(f"Running OCR: {input_path}")
+        
+        try:
+            success, error = self._run_ocr(input_path, output_path)
+            if not success:
+                return False, error
+            
+            logger.info(f"Successfully OCR'd PDF: {output_path}")
+            return True, None
+        
+        except Exception as e:
+            error_msg = f"Failed to OCR PDF: {e}"
+            logger.error(error_msg)
+            return False, error_msg
+    
+    def _has_split_marker_qr(self, image: Image.Image) -> bool:
+        """
+        Check if a page contains a QR code split marker.
+        This prevents split marker pages from being removed as blank.
+        
+        Args:
+            image: PIL Image of the page
+        
+        Returns:
+            True if split marker QR code is found
+        """
+        if not self.config.split_qr_enabled:
+            return False
+        
+        try:
+            from pyzbar import pyzbar
+            from pyzbar.pyzbar import ZBarSymbol
+            
+            # Convert to RGB if necessary
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            # Decode QR codes
+            decoded_objects = pyzbar.decode(image, symbols=[ZBarSymbol.QRCODE])
+            
+            for obj in decoded_objects:
+                try:
+                    content = obj.data.decode('utf-8')
+                    if content.strip() == self.config.split_qr_content:
+                        logger.debug(f"Page has split marker QR code: {content}")
+                        return True
+                except UnicodeDecodeError:
+                    pass
+        except Exception as e:
+            logger.debug(f"Error checking for split marker: {e}")
+        
+        return False
+    
     def _remove_blank_pages(self, input_path: str, output_path: str) -> int:
         """
         Remove blank pages from PDF.
+        Pages with split marker QR codes are preserved even if they appear blank.
         
         Args:
             input_path: Path to input PDF
@@ -82,7 +188,7 @@ class PDFProcessor:
         try:
             # Convert PDF pages to images for analysis
             logger.debug(f"Converting PDF to images for blank detection: {input_path}")
-            images = convert_from_path(input_path, dpi=72)  # Low DPI for speed
+            images = convert_from_path(input_path, dpi=150)  # Higher DPI for QR detection
             
             # Open PDF for page manipulation
             with pikepdf.Pdf.open(input_path) as pdf:
@@ -90,10 +196,14 @@ class PDFProcessor:
                     logger.warning("Page count mismatch between PDF and images")
                     return -1
                 
-                # Find non-blank pages
+                # Find non-blank pages (and preserve pages with split markers)
                 pages_to_keep: List[int] = []
                 for i, image in enumerate(images):
-                    if not self._is_blank_page(image):
+                    # Always keep pages with split marker QR codes
+                    if self._has_split_marker_qr(image):
+                        logger.debug(f"Page {i + 1} has split marker QR, keeping")
+                        pages_to_keep.append(i)
+                    elif not self._is_blank_page(image):
                         pages_to_keep.append(i)
                     else:
                         logger.debug(f"Page {i + 1} detected as blank")
