@@ -11,6 +11,14 @@
 #   --no-recursive, -R  Do not search subdirectories
 #   --verbose, -v       Enable verbose output
 #
+# Custom Fields:
+#   Configure PAPERLESS_CUSTOM_FIELDS in .env to set custom field values.
+#   The ${directory_path} variable resolves to the relative path from the
+#   base search directory.
+#
+#   Example .env:
+#     PAPERLESS_CUSTOM_FIELDS={"Physical Location": "${directory_path}"}
+#
 
 set -e
 
@@ -45,6 +53,17 @@ usage() {
     echo "Configuration:"
     echo "  The script uses ${ENV_FILE} for Paperless-ngx credentials."
     echo "  Required variables: PAPERLESS_URL, PAPERLESS_API_TOKEN"
+    echo ""
+    echo "Custom Fields:"
+    echo "  Set PAPERLESS_CUSTOM_FIELDS in .env to configure custom fields."
+    echo "  Available variables:"
+    echo "    \${directory_path}  Relative path from search directory"
+    echo "    \${year_month}      Year and month from document (YYYY-MM)"
+    echo "    \${filename}        Document filename"
+    echo "    \${title}           Document title"
+    echo ""
+    echo "  Example:"
+    echo "    PAPERLESS_CUSTOM_FIELDS={\"Physical Location\": \"\${directory_path}\"}"
     exit 1
 }
 
