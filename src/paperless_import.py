@@ -146,10 +146,8 @@ def import_documents(
     error_count = 0
     
     for file_path, year_month, created_date, relative_dir in documents:
-        # Build tags: year-month tag + any extra tags
-        tags = [year_month]
-        if extra_tags:
-            tags.extend(extra_tags)
+        # Use extra_tags if provided (replaces default), otherwise None (uses default from config)
+        tags = extra_tags if extra_tags else None
         
         # Title is the filename without extension
         title = file_path.stem
@@ -196,8 +194,8 @@ def main():
 Examples:
   %(prog)s /path/to/documents
   %(prog)s /path/to/documents --dry-run
-  %(prog)s /path/to/documents --tags Archive --tags Important
-  %(prog)s /path/to/documents --tags 'Cabinet-${directory_path}'
+  %(prog)s /path/to/documents --tags Archive --tags '${year_month}'
+  %(prog)s /path/to/documents --tags 'Cabinet-${directory_path}' --tags Inbox
   %(prog)s /path/to/documents --env /path/to/.env
 
 Tag Variables:
@@ -209,7 +207,7 @@ Tag Variables:
 Environment variables (can be set in .env file):
   PAPERLESS_URL           - Paperless-ngx server URL
   PAPERLESS_API_TOKEN     - API token for authentication
-  PAPERLESS_DEFAULT_TAGS  - Default tags (comma-separated, supports variables)
+  PAPERLESS_DEFAULT_TAGS  - Default tags (used when --tags is not specified)
 """
     )
     
@@ -229,7 +227,7 @@ Environment variables (can be set in .env file):
         '--tags', '-t',
         action='append',
         default=[],
-        help='Additional tags to apply (can be specified multiple times)'
+        help='Tags to apply (replaces PAPERLESS_DEFAULT_TAGS, supports variables)'
     )
     
     parser.add_argument(

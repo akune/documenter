@@ -46,7 +46,7 @@ Simply place PDF files in the `./input` folder. They will automatically be:
 4. Split at QR code separator pages
 6. Renamed to `YYYY-MM-DD_hh-mm-ss_<MD5>.pdf`
 6. Uploaded to Nextcloud (subfolder `YYYY-MM`)
-7. Sent to Paperless-ngx (tags: `Inbox`, `YYYY-MM`)
+7. Sent to Paperless-ngx with configured tags
 8. Deleted from input folder
 
 ## Configuration
@@ -178,11 +178,11 @@ It searches for files matching the pattern `YYYY-MM-DD_hh-mm-ss_HASH.pdf` and up
 # Import documents
 ./paperless-import.sh ~/Documents/Scans
 
-# With additional tags
-./paperless-import.sh ~/Documents/Scans --tags Archive --verbose
+# With custom tags (replaces defaults from .env)
+./paperless-import.sh ~/Documents/Scans --tags Archive --tags '${year_month}' --verbose
 
 # With dynamic tags using variables
-./paperless-import.sh ~/Documents/Archive/2023 -t 'Cabinet-${directory_path}'
+./paperless-import.sh ~/Documents/Archive/2023 -t 'Cabinet-${directory_path}' -t Inbox
 ```
 
 ### Using Docker Directly
@@ -196,7 +196,7 @@ docker compose run --rm documenter python3 /app/src/paperless_import.py /documen
 | Option | Description |
 |--------|-------------|
 | `--dry-run`, `-d` | Show what would be uploaded without uploading |
-| `--tags`, `-t` | Additional tags (can be used multiple times, supports variables) |
+| `--tags`, `-t` | Tags to apply (replaces PAPERLESS_DEFAULT_TAGS, supports variables) |
 | `--no-recursive`, `-R` | Do not search subdirectories |
 | `--verbose`, `-v` | Enable verbose output |
 
