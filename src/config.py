@@ -52,7 +52,9 @@ class Config:
     paperless_url: str = field(default_factory=lambda: os.getenv("PAPERLESS_URL", ""))
     paperless_api_token: str = field(default_factory=lambda: os.getenv("PAPERLESS_API_TOKEN", ""))
     paperless_default_tags: List[str] = field(default_factory=lambda: [
-        _strip_quotes(tag.strip()) for tag in _strip_quotes(os.getenv("PAPERLESS_DEFAULT_TAGS", "Inbox")).split(",") if tag.strip()
+        tag.strip()
+        for tag in _strip_quotes(os.getenv("PAPERLESS_DEFAULT_TAGS", "Inbox")).split(",")
+        if tag.strip()
     ])
     paperless_group: str = field(default_factory=lambda: os.getenv("PAPERLESS_GROUP", ""))
     
