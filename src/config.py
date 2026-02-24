@@ -8,6 +8,15 @@ from dataclasses import dataclass, field
 from typing import List
 
 
+def _strip_quotes(value: str) -> str:
+    """Strip surrounding single or double quotes from a value."""
+    if len(value) >= 2:
+        if (value.startswith("'") and value.endswith("'")) or \
+           (value.startswith('"') and value.endswith('"')):
+            return value[1:-1]
+    return value
+
+
 @dataclass
 class Config:
     """Configuration settings loaded from environment variables."""
@@ -43,7 +52,7 @@ class Config:
     paperless_url: str = field(default_factory=lambda: os.getenv("PAPERLESS_URL", ""))
     paperless_api_token: str = field(default_factory=lambda: os.getenv("PAPERLESS_API_TOKEN", ""))
     paperless_default_tags: List[str] = field(default_factory=lambda: [
-        tag.strip() for tag in os.getenv("PAPERLESS_DEFAULT_TAGS", "Inbox").split(",") if tag.strip()
+        _strip_quotes(tag.strip()) for tag in _strip_quotes(os.getenv("PAPERLESS_DEFAULT_TAGS", "Inbox")).split(",") if tag.strip()
     ])
     paperless_group: str = field(default_factory=lambda: os.getenv("PAPERLESS_GROUP", ""))
     
