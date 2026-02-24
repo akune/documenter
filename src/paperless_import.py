@@ -196,6 +196,7 @@ Examples:
   %(prog)s /path/to/documents --dry-run
   %(prog)s /path/to/documents --tags Archive --tags '${year_month}'
   %(prog)s /path/to/documents --tags 'Cabinet-${directory_path}' --tags Inbox
+  %(prog)s /path/to/documents --group Importers
   %(prog)s /path/to/documents --env /path/to/.env
 
 Tag Variables:
@@ -208,6 +209,7 @@ Environment variables (can be set in .env file):
   PAPERLESS_URL           - Paperless-ngx server URL
   PAPERLESS_API_TOKEN     - API token for authentication
   PAPERLESS_DEFAULT_TAGS  - Default tags (used when --tags is not specified)
+  PAPERLESS_GROUP         - Group to grant document permissions (used when --group is not specified)
 """
     )
     
@@ -247,6 +249,13 @@ Environment variables (can be set in .env file):
         '--verbose', '-v',
         action='store_true',
         help='Enable verbose output'
+    )
+    
+    parser.add_argument(
+        '--group', '-g',
+        type=str,
+        default=None,
+        help='Group to grant permissions on uploaded documents (overrides PAPERLESS_GROUP)'
     )
     
     args = parser.parse_args()
@@ -296,8 +305,14 @@ Environment variables (can be set in .env file):
         logger.error("PAPERLESS_API_TOKEN is not set")
         sys.exit(1)
     
-    # Create uploader
-    uploader = PaperlessUploader(config)
+    # Create uploader with optional group override
+    group_override = args.group if args.group else None
+    uploader = PaperlessUploader(config, group_override=group_override)
+    
+    if group_override:
+        logger.info(f"Using group override: {group_override}")
+    elif config.paperless_group:
+        logger.info(f"Using group from config: {config.paperless_group}")
     
     # Test connection (unless dry-run)
     if not args.dry_run:

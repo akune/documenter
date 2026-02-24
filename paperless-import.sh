@@ -9,6 +9,7 @@
 #   --dry-run, -d              Show what would be uploaded without actually uploading
 #   --tags, -t TAGS            Tags to apply (replaces PAPERLESS_DEFAULT_TAGS from .env)
 #                              Supports variables: ${directory_path}, ${year_month}, ${filename}, ${title}
+#   --group, -g GROUP          Group to grant permissions (overrides PAPERLESS_GROUP from .env)
 #   --no-recursive, -R         Do not search subdirectories
 #   --verbose, -v              Enable verbose output
 #
@@ -37,6 +38,8 @@ usage() {
     echo "  --dry-run, -d              Show what would be uploaded without uploading"
     echo "  --tags, -t TAGS            Tags to apply (replaces PAPERLESS_DEFAULT_TAGS)"
     echo "                             Supports variables for dynamic tag names"
+    echo "  --group, -g GROUP          Group to grant document permissions"
+    echo "                             Overrides PAPERLESS_GROUP from .env"
     echo "  --no-recursive, -R         Do not search subdirectories"
     echo "  --verbose, -v              Enable verbose output"
     echo ""
@@ -44,6 +47,7 @@ usage() {
     echo "  $0 ~/Documents/Scans --dry-run"
     echo "  $0 ~/Documents/Scans --tags Archive --tags '\${year_month}' --verbose"
     echo "  $0 ~/Documents/Archive/2023 -t 'Cabinet-\${directory_path}' -t Inbox"
+    echo "  $0 ~/Documents/Scans --group Importers"
     echo ""
     echo "Tag Variables:"
     echo "  \${directory_path}  Relative path from search directory"

@@ -49,7 +49,15 @@ def extract_date_from_filename(filename: str) -> Optional[datetime]:
 class PaperlessUploader:
     """Handles document uploads to Paperless-ngx via REST API."""
     
-    def __init__(self, config: Config):
+    # Group permissions for document access
+    GROUP_PERMISSIONS = [
+        'add_document', 'view_document',
+        'add_tag', 'view_tag',
+        'view_uisettings',
+        'add_note', 'change_note', 'delete_note', 'view_note',
+    ]
+    
+    def __init__(self, config: Config, group_override: Optional[str] = None):
         self.config = config
         self.base_url = config.paperless_url.rstrip('/')
         self.headers = {
@@ -58,6 +66,87 @@ class PaperlessUploader:
         }
         self.timeout = 120  # 2 minutes timeout for large files
         self._tag_cache: Dict[str, int] = {}  # Cache tag name -> ID mappings
+        self._group_cache: Dict[str, int] = {}  # Cache group name -> ID mappings
+        
+        # Use override if provided, otherwise use config
+        self._group_name = group_override if group_override else config.paperless_group
+        self._group_id: Optional[int] = None
+        
+        # Initialize group if configured
+        if self._group_name:
+            self._group_id = self._get_or_create_group(self._group_name)
+    
+    def _get_or_create_group(self, group_name: str) -> Optional[int]:
+        """
+        Get group ID by name, creating it with proper permissions if it doesn't exist.
+        
+        Args:
+            group_name: Name of the group
+        
+        Returns:
+            Group ID or None on error
+        """
+        if group_name in self._group_cache:
+            return self._group_cache[group_name]
+        
+        try:
+            # Search for existing group
+            response = requests.get(
+                f"{self.base_url}/api/groups/",
+                headers=self.headers,
+                params={'name__iexact': group_name},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                results = response.json().get('results', [])
+                if results:
+                    group_id = results[0]['id']
+                    self._group_cache[group_name] = group_id
+                    logger.debug(f"Found existing group '{group_name}' with ID {group_id}")
+                    # Ensure permissions are set
+                    self._ensure_group_permissions(group_id, group_name)
+                    return group_id
+            
+            # Group doesn't exist, create it with permissions
+            response = requests.post(
+                f"{self.base_url}/api/groups/",
+                headers={**self.headers, 'Content-Type': 'application/json'},
+                json={
+                    'name': group_name,
+                    'permissions': self.GROUP_PERMISSIONS
+                },
+                timeout=30
+            )
+            
+            if response.status_code in [200, 201]:
+                group_id = response.json()['id']
+                self._group_cache[group_name] = group_id
+                logger.info(f"Created new group '{group_name}' with ID {group_id}")
+                return group_id
+            else:
+                logger.error(f"Failed to create group '{group_name}': {response.status_code} {response.text}")
+                return None
+        
+        except requests.RequestException as e:
+            logger.error(f"Error getting/creating group '{group_name}': {e}")
+            return None
+    
+    def _ensure_group_permissions(self, group_id: int, group_name: str) -> None:
+        """Ensure the group has the required permissions."""
+        try:
+            response = requests.patch(
+                f"{self.base_url}/api/groups/{group_id}/",
+                headers={**self.headers, 'Content-Type': 'application/json'},
+                json={'permissions': self.GROUP_PERMISSIONS},
+                timeout=30
+            )
+            if response.status_code in [200, 204]:
+                logger.debug(f"Updated permissions for group '{group_name}'")
+            else:
+                logger.warning(f"Could not update group permissions: {response.status_code}")
+        except requests.RequestException as e:
+            logger.warning(f"Error updating group permissions: {e}")
     
     def _get_tag_id(self, tag_name: str) -> Optional[int]:
         """
@@ -213,6 +302,17 @@ class PaperlessUploader:
                 # Add tags (paperless-ngx accepts multiple 'tags' fields)
                 for tag_id in tag_ids:
                     data_items.append(('tags', str(tag_id)))
+                
+                # Add group permissions if configured
+                if self._group_id:
+                    # set_permissions format: {"view": {"groups": [id]}, "change": {"groups": [id]}}
+                    import json
+                    permissions = {
+                        'view': {'groups': [self._group_id]},
+                        'change': {'groups': [self._group_id]}
+                    }
+                    data_items.append(('set_permissions', json.dumps(permissions)))
+                    logger.debug(f"Setting document permissions for group ID {self._group_id}")
                 
                 response = requests.post(
                     url,

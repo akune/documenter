@@ -45,6 +45,7 @@ class Config:
     paperless_default_tags: List[str] = field(default_factory=lambda: [
         tag.strip() for tag in os.getenv("PAPERLESS_DEFAULT_TAGS", "Inbox").split(",") if tag.strip()
     ])
+    paperless_group: str = field(default_factory=lambda: os.getenv("PAPERLESS_GROUP", ""))
     
     # Processing settings
     delete_source: bool = field(default_factory=lambda: os.getenv("DELETE_SOURCE", "true").lower() == "true")
@@ -102,6 +103,7 @@ class Config:
             f"  paperless_enabled={self.paperless_enabled}\n"
             f"  paperless_url={self.paperless_url}\n"
             f"  paperless_default_tags={self.paperless_default_tags}\n"
+            f"  paperless_group={self.paperless_group}\n"
             f"  output_dir_enabled={self.output_dir_enabled}\n"
             f"  output_dir={self.output_dir}\n"
             f"  output_dir_use_subfolders={self.output_dir_use_subfolders}\n"
