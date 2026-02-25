@@ -78,6 +78,7 @@ class DocumentProcessor:
     
     def __init__(self, config: Config):
         self.config = config
+        logger.info(f"Loaded PAPERLESS_GROUP from config: '{self.config.paperless_group}'")
         self.pdf_processor = PDFProcessor(config)
         self.document_splitter = DocumentSplitter(config)
         self.nextcloud_uploader = NextcloudUploader(config) if config.nextcloud_enabled else None
@@ -243,6 +244,7 @@ class DocumentProcessor:
                     
                     # Step 5: Upload to Paperless-ngx
                     if self.paperless_uploader:
+                        logger.info(f"Preparing to upload to Paperless-ngx with group: '{self.config.paperless_group}'")
                         # Tag context - use year_month as directory_path for processed documents
                         tag_context = {
                             'directory_path': year_month,

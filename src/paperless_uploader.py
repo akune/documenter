@@ -67,16 +67,18 @@ class PaperlessUploader:
         self.timeout = 120  # 2 minutes timeout for large files
         self._tag_cache: Dict[str, int] = {}  # Cache tag name -> ID mappings
         self._group_cache: Dict[str, int] = {}  # Cache group name -> ID mappings
-        
+
         # Use override if provided, otherwise use config
         self._group_name = group_override if group_override else config.paperless_group
         self._group_id: Optional[int] = None
-        
+
+        logger.info(f"PaperlessUploader initialized with group: '{self._group_name}'")
         # Initialize group if configured
         if self._group_name:
             self._group_id = self._get_or_create_group(self._group_name)
     
     def _get_or_create_group(self, group_name: str) -> Optional[int]:
+        logger.info(f"Ensuring group exists in Paperless-ngx: '{group_name}'")
         """
         Get group ID by name, creating it with proper permissions if it doesn't exist.
         
@@ -305,14 +307,13 @@ class PaperlessUploader:
                 
                 # Add group permissions if configured
                 if self._group_id:
-                    # set_permissions format: {"view": {"groups": [id]}, "change": {"groups": [id]}}
                     import json
                     permissions = {
-                        'view': {'groups': [self._group_id]},
-                        'change': {'groups': [self._group_id]}
+                        'view': {'users': [], 'groups': [self._group_id]},
+                        'change': {'users': [], 'groups': [self._group_id]}
                     }
                     data_items.append(('set_permissions', json.dumps(permissions)))
-                    logger.debug(f"Setting document permissions for group ID {self._group_id}")
+                    logger.info(f"Setting document permissions for group ID {self._group_id}: {json.dumps(permissions)}")
                 
                 response = requests.post(
                     url,

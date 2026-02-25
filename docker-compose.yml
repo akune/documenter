@@ -43,6 +43,7 @@ services:
       - PAPERLESS_URL=${PAPERLESS_URL:-}
       - PAPERLESS_API_TOKEN=${PAPERLESS_API_TOKEN:-}
       - PAPERLESS_DEFAULT_TAGS=${PAPERLESS_DEFAULT_TAGS:-Inbox}
+      - PAPERLESS_GROUP=${PAPERLESS_GROUP:-}
       
       # Processing settings
       - DELETE_SOURCE=${DELETE_SOURCE:-true}
