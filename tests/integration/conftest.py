@@ -6,7 +6,6 @@ Run via: make test-integration
 import sys
 import time
 import uuid
-import tempfile
 from pathlib import Path
 from typing import Generator
 
@@ -14,92 +13,25 @@ import pytest
 import requests
 from requests.auth import HTTPBasicAuth
 
-# Make src/ importable without installation
+# Make src/ and the integration test directory importable
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Config
 from paperless_uploader import PaperlessUploader
 from nextcloud_uploader import NextcloudUploader
 
-# ── Service coordinates ────────────────────────────────────────────────────────
-
-PAPERLESS_URL = "http://localhost:8010"
-NEXTCLOUD_URL = "http://localhost:8011"
-
-ADMIN_USER = "admin"
-ADMIN_PASSWORD = "admin"
-USER1 = "user1"
-USER1_PASSWORD = "user1password"
-USER2 = "user2"
-USER2_PASSWORD = "user2password"
-GROUP_NAME = "TestFamily"
-NEXTCLOUD_TARGET_DIR = "/Documents/Scans"
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-
-def _paperless_token(username: str, password: str) -> str:
-    """Fetch a Paperless-ngx API token."""
-    r = requests.post(
-        f"{PAPERLESS_URL}/api/token/",
-        json={"username": username, "password": password},
-        timeout=30,
-    )
-    r.raise_for_status()
-    return r.json()["token"]
-
-
-def _paperless_session(token: str) -> requests.Session:
-    s = requests.Session()
-    s.headers.update({
-        "Authorization": f"Token {token}",
-        "Accept": "application/json; version=6",
-    })
-    return s
-
-
-def _minimal_pdf() -> bytes:
-    """Generate a minimal valid single-page blank PDF from first principles."""
-    header = b"%PDF-1.4\n"
-    obj1   = b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
-    obj2   = b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
-    obj3   = b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\n"
-
-    off = [len(header)]
-    off.append(off[0] + len(obj1))
-    off.append(off[1] + len(obj2))
-    xref_pos = off[2] + len(obj3)
-
-    xref = (
-        b"xref\n0 4\n"
-        b"0000000000 65535 f \n"
-        + f"{off[0]:010d} 00000 n \n".encode()
-        + f"{off[1]:010d} 00000 n \n".encode()
-        + f"{off[2]:010d} 00000 n \n".encode()
-    )
-    trailer = (
-        b"trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n"
-        + str(xref_pos).encode()
-        + b"\n%%EOF\n"
-    )
-    return header + obj1 + obj2 + obj3 + xref + trailer
-
-
-def _wait_for_document(session: requests.Session, title: str, timeout: int = 120) -> dict:
-    """Poll until a document with the given title appears in Paperless-ngx."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        r = session.get(f"{PAPERLESS_URL}/api/documents/", params={"title__iexact": title}, timeout=10)
-        if r.status_code == 200:
-            results = r.json().get("results", [])
-            if results:
-                return results[0]
-        time.sleep(3)
-    raise TimeoutError(f"Document '{title}' did not appear in Paperless-ngx within {timeout}s")
+from helpers import (
+    PAPERLESS_URL, NEXTCLOUD_URL,
+    ADMIN_USER, ADMIN_PASSWORD,
+    USER1, USER1_PASSWORD,
+    USER2, USER2_PASSWORD,
+    GROUP_NAME, NEXTCLOUD_TARGET_DIR,
+    minimal_pdf, paperless_token, paperless_session, wait_for_document, wait_for_task,
+)
 
 
 # ── Service readiness ─────────────────────────────────────────────────────────
-
 
 @pytest.fixture(scope="session", autouse=True)
 def wait_for_services() -> None:
@@ -113,9 +45,12 @@ def _wait_paperless(timeout: int = 120) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            r = requests.get(f"{PAPERLESS_URL}/api/tags/", timeout=5,
-                             headers={"Accept": "application/json; version=6",
-                                      "Authorization": "Token placeholder"})
+            r = requests.get(
+                f"{PAPERLESS_URL}/api/tags/",
+                headers={"Accept": "application/json; version=6",
+                         "Authorization": "Token placeholder"},
+                timeout=5,
+            )
             if r.status_code in (200, 401, 403):
                 return
         except requests.RequestException:
@@ -124,21 +59,22 @@ def _wait_paperless(timeout: int = 120) -> None:
     pytest.fail(f"Paperless-ngx at {PAPERLESS_URL} did not become reachable within {timeout}s")
 
 
-def _wait_nextcloud(timeout: int = 120) -> None:
+def _wait_nextcloud(timeout: int = 300) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
             r = requests.get(f"{NEXTCLOUD_URL}/status.php", timeout=5)
-            if r.status_code == 200:
+            if r.status_code == 200 and r.json().get("installed") is True:
                 return
-        except requests.RequestException:
+        except (requests.RequestException, ValueError):
             pass
         time.sleep(2)
-    pytest.fail(f"Nextcloud at {NEXTCLOUD_URL} did not become reachable within {timeout}s")
+    pytest.fail(f"Nextcloud at {NEXTCLOUD_URL} did not finish installing within {timeout}s")
 
 
 def _wait_for_init(timeout: int = 120) -> None:
-    """Wait until test users can authenticate — confirms init completed."""
+    """Wait until test users can authenticate in both services — confirms init completed."""
+    # Verify Paperless user1 can obtain a token
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -148,36 +84,52 @@ def _wait_for_init(timeout: int = 120) -> None:
                 timeout=10,
             )
             if r.status_code == 200:
+                break
+        except requests.RequestException:
+            pass
+        time.sleep(3)
+    else:
+        pytest.fail("Paperless test users were not created within timeout — did test-init complete?")
+
+    # Verify Nextcloud user1 can authenticate via WebDAV (also triggers home dir creation)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            r = requests.request(
+                "PROPFIND",
+                f"{NEXTCLOUD_URL}/remote.php/dav/files/{USER1}/",
+                auth=(USER1, USER1_PASSWORD),
+                headers={"Depth": "0"},
+                timeout=10,
+            )
+            if r.status_code in (200, 207):
                 return
         except requests.RequestException:
             pass
         time.sleep(3)
-    pytest.fail("Test users were not created within timeout — did test-init complete?")
+    pytest.fail("Nextcloud test users were not ready within timeout — did test-init complete?")
 
 
 # ── Paperless fixtures ────────────────────────────────────────────────────────
 
-
 @pytest.fixture(scope="session")
 def admin_token() -> str:
-    return _paperless_token(ADMIN_USER, ADMIN_PASSWORD)
+    return paperless_token(ADMIN_USER, ADMIN_PASSWORD)
 
 
 @pytest.fixture(scope="session")
 def admin_session(admin_token) -> requests.Session:
-    return _paperless_session(admin_token)
+    return paperless_session(admin_token)
 
 
 @pytest.fixture(scope="session")
 def user1_session() -> requests.Session:
-    token = _paperless_token(USER1, USER1_PASSWORD)
-    return _paperless_session(token)
+    return paperless_session(paperless_token(USER1, USER1_PASSWORD))
 
 
 @pytest.fixture(scope="session")
 def user2_session() -> requests.Session:
-    token = _paperless_token(USER2, USER2_PASSWORD)
-    return _paperless_session(token)
+    return paperless_session(paperless_token(USER2, USER2_PASSWORD))
 
 
 def _make_paperless_config(token: str, group: str = "") -> Config:
@@ -204,37 +156,47 @@ def paperless_admin_client_no_group(admin_token) -> PaperlessUploader:
 
 
 @pytest.fixture
-def sample_pdf(tmp_path) -> Path:
-    """Write a minimal valid PDF to a temp file and return its path."""
-    pdf_path = tmp_path / f"test_{uuid.uuid4().hex[:8]}.pdf"
-    pdf_path.write_bytes(_minimal_pdf())
+def unique_pdf(tmp_path) -> Path:
+    """Write a uniquely-content PDF to avoid Paperless duplicate detection."""
+    uid = uuid.uuid4().hex
+    pdf_bytes = minimal_pdf() + f"\n% unique-{uid}\n".encode()
+    pdf_path = tmp_path / f"unique_{uid[:8]}.pdf"
+    pdf_path.write_bytes(pdf_bytes)
     return pdf_path
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
+def sample_pdf(tmp_path_factory) -> Path:
+    """Write a minimal valid PDF to a temp file and return its path."""
+    pdf_path = tmp_path_factory.mktemp("pdfs") / f"test_{uuid.uuid4().hex[:8]}.pdf"
+    pdf_path.write_bytes(minimal_pdf())
+    return pdf_path
+
+
+@pytest.fixture(scope="session")
 def uploaded_document(paperless_admin_client, admin_session, sample_pdf) -> Generator:
-    """Upload a document, yield its metadata dict, then delete it."""
+    """Upload a document once per session, yield its metadata dict, delete on teardown."""
     title = f"IntegTest-{uuid.uuid4().hex[:8]}"
     tag_context = {"year_month": "2026-03", "directory_path": "2026-03"}
 
-    ok, err = paperless_admin_client.upload(
+    ok, task_id = paperless_admin_client.upload(
         str(sample_pdf), title, created_date=None, tag_context=tag_context
     )
-    assert ok, f"Upload failed: {err}"
+    assert ok, f"Upload failed: {task_id}"
 
-    doc = _wait_for_document(admin_session, title)
+    doc_id = wait_for_task(admin_session, task_id)
+    r = admin_session.get(f"{PAPERLESS_URL}/api/documents/{doc_id}/", timeout=10)
+    r.raise_for_status()
+    doc = r.json()
     yield doc
 
-    # Cleanup
-    doc_id = doc["id"]
-    admin_session.delete(f"{PAPERLESS_URL}/api/documents/{doc_id}/", timeout=10)
+    admin_session.delete(f"{PAPERLESS_URL}/api/documents/{doc['id']}/", timeout=10)
 
 
 # ── Nextcloud fixtures ────────────────────────────────────────────────────────
 
-
 @pytest.fixture(scope="session")
-def nextcloud_admin_uploader(admin_token) -> NextcloudUploader:
+def nextcloud_admin_uploader() -> NextcloudUploader:
     config = Config(
         nextcloud_url=NEXTCLOUD_URL,
         nextcloud_user=ADMIN_USER,

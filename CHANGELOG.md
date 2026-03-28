@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Makefile` with `make test-integration` target
 
 ### Fixed
+- `PaperlessUploader.upload()` now waits for the Celery consumer task and sets group permissions via PATCH after document creation (`set_permissions` in `post_document` is silently ignored by Paperless-ngx 2.20)
+- Integration tests: `PaperlessUploader.upload()` returns the Celery task ID on success, enabling reliable task-based document polling
+- Integration tests: `uploaded_document` and `sample_pdf` fixtures are now session-scoped to avoid redundant uploads across tests
+- Integration tests: per-test uploads use `unique_pdf` fixture to avoid Paperless duplicate-detection failures
+- Integration tests: `_wait_for_init` now also verifies Nextcloud user1 WebDAV authentication, triggering home-directory creation before tests run
+- Integration tests: Nextcloud healthcheck now requires `"installed":true` in `status.php` so the init container does not start before installation is complete
+- Integration tests: Nextcloud `NEXTCLOUD_TRUSTED_DOMAINS` now includes the Docker service name so the init container can reach the OCS API
+- Integration tests: Nextcloud test-user passwords updated to pass Nextcloud 33's compromised-password policy
+- Integration tests: Makefile `test-integration-up` starts core services with `--wait` first, then starts the one-shot init container separately to avoid `--wait` failing on an exited container
+- Integration tests: `init_nextcloud.py` verifies `installed:true` before making OCS API calls
 - Dockerfile: re-declare `ARG VERSION` after `FROM` so the OCI version label is correctly set (fixes build warning)
 - SIGTERM (Docker stop/restart) now triggers graceful shutdown, same as Ctrl+C
 - Shutdown timeout increased from 5 s to 60 s so large PDFs finish processing before exit

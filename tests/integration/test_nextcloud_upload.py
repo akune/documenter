@@ -8,7 +8,7 @@ import pytest
 import requests
 from requests.auth import HTTPBasicAuth
 
-from conftest import NEXTCLOUD_URL, ADMIN_USER, ADMIN_PASSWORD, USER1, USER1_PASSWORD, NEXTCLOUD_TARGET_DIR
+from helpers import NEXTCLOUD_URL, ADMIN_USER, ADMIN_PASSWORD, USER1, USER1_PASSWORD, NEXTCLOUD_TARGET_DIR
 
 
 def _webdav_url(username: str, path: str) -> str:

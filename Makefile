@@ -7,7 +7,8 @@ test-integration: test-integration-up
 	$(MAKE) test-integration-down
 
 test-integration-up:
-	$(COMPOSE) up -d --wait
+	$(COMPOSE) up -d --wait paperless nextcloud paperless-redis
+	$(COMPOSE) up -d test-init
 	$(COMPOSE) wait test-init
 
 test-integration-down:

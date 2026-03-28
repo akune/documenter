@@ -8,7 +8,7 @@ from datetime import datetime
 
 import pytest
 
-from conftest import PAPERLESS_URL, _wait_for_document
+from helpers import PAPERLESS_URL, wait_for_document, wait_for_task
 
 
 class TestPaperlessUpload:
@@ -36,20 +36,23 @@ class TestPaperlessUpload:
             f"Expected 'TestInbox' tag; found: {tag_names}"
         )
 
-    def test_upload_with_created_date(self, paperless_admin_client, admin_session, sample_pdf):
+    def test_upload_with_created_date(self, paperless_admin_client, admin_session, unique_pdf):
         """Document created date is set from the value passed at upload."""
         title = f"DateTest-{uuid.uuid4().hex[:8]}"
         created = datetime(2025, 6, 15, 10, 30, 0)
 
-        ok, err = paperless_admin_client.upload(
-            str(sample_pdf),
+        ok, task_id = paperless_admin_client.upload(
+            str(unique_pdf),
             title,
             created_date=created,
             tag_context={"year_month": "2025-06", "directory_path": "2025-06"},
         )
-        assert ok, f"Upload failed: {err}"
+        assert ok, f"Upload failed: {task_id}"
 
-        doc = _wait_for_document(admin_session, title)
+        doc_id = wait_for_task(admin_session, task_id)
+        r = admin_session.get(f"{PAPERLESS_URL}/api/documents/{doc_id}/", timeout=10)
+        r.raise_for_status()
+        doc = r.json()
         try:
             assert "2025-06-15" in (doc.get("created") or doc.get("created_date") or "")
         finally:

@@ -3,9 +3,9 @@ Paperless-ngx uploader module.
 Uploads documents to Paperless-ngx via REST API.
 """
 
-import json
 import logging
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -135,6 +135,61 @@ class PaperlessUploader:
             logger.error(f"Error getting/creating group '{group_name}': {e}")
             return None
     
+    def _wait_for_task_result(self, task_id: str, timeout: int = 300) -> Optional[int]:
+        """
+        Poll the tasks API until the task completes.
+
+        Returns:
+            Document ID on SUCCESS, None if task failed or timed out.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                response = requests.get(
+                    f"{self.base_url}/api/tasks/",
+                    headers=self.headers,
+                    params={'task_id': task_id},
+                    timeout=10
+                )
+                if response.status_code == 200:
+                    results = response.json()
+                    if results:
+                        task = results[0]
+                        status = task.get('status')
+                        if status == 'SUCCESS':
+                            related_doc = task.get('related_document')
+                            return int(related_doc) if related_doc is not None else None
+                        if status in ('FAILURE', 'REVOKED'):
+                            logger.warning(f"Task {task_id} ended with status {status}: {task.get('result', '')}")
+                            return None
+            except requests.RequestException as e:
+                logger.warning(f"Error polling task {task_id}: {e}")
+            time.sleep(3)
+        logger.warning(f"Task {task_id} did not complete within {timeout}s")
+        return None
+
+    def _set_document_permissions(self, doc_id: int) -> None:
+        """Set group view/change permissions on a document via PATCH."""
+        if not self._group_id:
+            return
+        permissions = {
+            'view': {'users': [], 'groups': [self._group_id]},
+            'change': {'users': [], 'groups': [self._group_id]}
+        }
+        try:
+            response = requests.patch(
+                f"{self.base_url}/api/documents/{doc_id}/",
+                headers={**self.headers, 'Content-Type': 'application/json'},
+                json={'set_permissions': permissions},
+                timeout=30
+            )
+            if response.status_code in (200, 201):
+                logger.info(f"Set group permissions on document {doc_id} for group ID {self._group_id}")
+            else:
+                logger.warning(f"Could not set permissions on document {doc_id}: {response.status_code}")
+        except requests.RequestException as e:
+            logger.warning(f"Error setting permissions on document {doc_id}: {e}")
+
     def _ensure_group_permissions(self, group_id: int, group_name: str) -> None:
         """Ensure the group has the required permissions."""
         try:
@@ -312,15 +367,6 @@ class PaperlessUploader:
                 for tag_id in tag_ids:
                     data_items.append(('tags', str(tag_id)))
                 
-                # Add group permissions if configured
-                if self._group_id:
-                    permissions = {
-                        'view': {'users': [], 'groups': [self._group_id]},
-                        'change': {'users': [], 'groups': [self._group_id]}
-                    }
-                    data_items.append(('set_permissions', json.dumps(permissions)))
-                    logger.info(f"Setting document permissions for group ID {self._group_id}: {json.dumps(permissions)}")
-                
                 response = requests.post(
                     url,
                     headers={'Authorization': f'Token {self.config.paperless_api_token}'},
@@ -328,11 +374,19 @@ class PaperlessUploader:
                     data=data_items,
                     timeout=self.timeout
                 )
-            
+
             if response.status_code in [200, 202]:
                 task_id = response.json() if response.text else None
                 logger.info(f"Successfully uploaded to Paperless-ngx. Task ID: {task_id}")
-                return True, None
+
+                # set_permissions in post_document is not applied by Paperless-ngx;
+                # wait for the consumer task to complete, then PATCH permissions.
+                if task_id and self._group_id:
+                    doc_id = self._wait_for_task_result(str(task_id))
+                    if doc_id:
+                        self._set_document_permissions(doc_id)
+
+                return True, str(task_id) if task_id else None
             else:
                 error_msg = f"Upload failed: {response.status_code} {response.text}"
                 logger.error(error_msg)

@@ -19,8 +19,8 @@ GROUP_NAME = "TestFamily"
 SCAN_DIR = "/Documents/Scans"
 
 TEST_USERS = [
-    {"userid": "user1", "password": "user1password", "email": "user1@test.local"},
-    {"userid": "user2", "password": "user2password", "email": "user2@test.local"},
+    {"userid": "user1", "password": "Nxt-Cl0ud-Test!U1", "email": "user1@test.local"},
+    {"userid": "user2", "password": "Nxt-Cl0ud-Test!U2", "email": "user2@test.local"},
 ]
 
 auth = HTTPBasicAuth(ADMIN_USER, ADMIN_PASSWORD)
@@ -106,8 +106,25 @@ def share_scan_dir_with_group() -> None:
         print(f"  Warning: share result: {r.status_code} {r.text[:200]}")
 
 
+def wait_for_installed(timeout: int = 120) -> None:
+    """Block until Nextcloud reports installed:true in status.php."""
+    import time as _time
+    deadline = _time.time() + timeout
+    while _time.time() < deadline:
+        try:
+            r = requests.get(f"{NEXTCLOUD_URL}/status.php", timeout=5)
+            if r.status_code == 200 and r.json().get("installed") is True:
+                print("  Nextcloud is installed and ready")
+                return
+        except Exception:
+            pass
+        _time.sleep(3)
+    raise SystemExit("Nextcloud did not become installed within timeout")
+
+
 def main() -> None:
     print("Initializing Nextcloud...")
+    wait_for_installed()
     create_users()
     create_group()
     add_users_to_group()

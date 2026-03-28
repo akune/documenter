@@ -23,8 +23,8 @@ GROUP_PERMISSIONS = [
 ]
 
 TEST_USERS = [
-    {"username": "user1", "password": "user1password", "email": "user1@test.local"},
-    {"username": "user2", "password": "user2password", "email": "user2@test.local"},
+    {"username": "user1", "password": "Nxt-Cl0ud-Test!U1", "email": "user1@test.local"},
+    {"username": "user2", "password": "Nxt-Cl0ud-Test!U2", "email": "user2@test.local"},
 ]
 
 

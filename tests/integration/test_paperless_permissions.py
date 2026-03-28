@@ -9,7 +9,7 @@ import uuid
 import pytest
 import requests
 
-from conftest import PAPERLESS_URL, GROUP_NAME, _wait_for_document
+from helpers import PAPERLESS_URL, GROUP_NAME, wait_for_document, wait_for_task
 
 
 class TestPaperlessPermissions:
@@ -65,21 +65,24 @@ class TestPaperlessPermissions:
         )
 
     def test_document_not_visible_without_group(
-        self, paperless_admin_client_no_group, admin_session, user1_session, sample_pdf
+        self, paperless_admin_client_no_group, admin_session, user1_session, unique_pdf
     ):
         """
         Negative test: a document uploaded WITHOUT group permissions is not visible
         to user1, confirming that permissions are not granted by default.
         """
         title = f"NoGroup-{uuid.uuid4().hex[:8]}"
-        ok, err = paperless_admin_client_no_group.upload(
-            str(sample_pdf),
+        ok, task_id = paperless_admin_client_no_group.upload(
+            str(unique_pdf),
             title,
             tag_context={"year_month": "2026-03", "directory_path": "2026-03"},
         )
-        assert ok, f"Upload failed: {err}"
+        assert ok, f"Upload failed: {task_id}"
 
-        doc = _wait_for_document(admin_session, title)
+        doc_id = wait_for_task(admin_session, task_id)
+        r = admin_session.get(f"{PAPERLESS_URL}/api/documents/{doc_id}/", timeout=10)
+        r.raise_for_status()
+        doc = r.json()
         doc_id = doc["id"]
         try:
             r = user1_session.get(f"{PAPERLESS_URL}/api/documents/{doc_id}/", timeout=10)
