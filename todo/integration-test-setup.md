@@ -1,6 +1,33 @@
 # Integration Test Setup
 
-> **Status: TODO** — Concept documented, not yet implemented.
+> **Status: TODO** — Concept updated after feasibility review (2026-03-28).
+
+---
+
+## Feasibility Assessment
+
+The plan is **feasible as-is** with one correction: the original init strategy
+assumed `docker exec` to run `manage.py` and `occ` commands, but a one-shot
+init container cannot exec into sibling containers without mounting the Docker
+socket. Both services expose HTTP APIs that can be used instead — this is
+actually simpler and more portable.
+
+All other design decisions hold up.
+
+---
+
+## Changes Since Original Plan
+
+| Change | Impact on tests |
+|---|---|
+| Tags now get `set_permissions` on creation (the bug fix) | `test_tag_visible_to_user1/2` now tests real production behaviour |
+| SIGTERM handled for graceful shutdown | No impact on tests |
+| Import cleanup, docstring fix | No impact on tests |
+
+The permission tests are now the **most important** tests to have — they verify
+the exact fix that was made.
+
+---
 
 ## Goal
 
@@ -15,17 +42,20 @@ and automated pytest runs.
 ```
 tests/integration/
 ├── docker-compose.test.yml      # All test services
-├── .env.test                    # Fixed credentials for test env
+├── .env.test                    # Fixed credentials for test env (committed)
 ├── init/
-│   ├── init_paperless.sh        # Creates users, group, API tokens in Paperless
-│   └── init_nextcloud.sh        # Creates users, shared folder in Nextcloud
+│   ├── init_paperless.py        # Creates users, group, token via Paperless REST API
+│   └── init_nextcloud.py        # Creates users, shared folder via Nextcloud OCS API
 ├── fixtures/
 │   └── sample.pdf               # Minimal valid PDF for upload tests
-├── conftest.py                  # pytest fixtures (service URLs, tokens, clients)
+├── conftest.py                  # pytest fixtures
 ├── test_paperless_upload.py     # Upload + metadata correctness
-├── test_paperless_permissions.py# Tag/document visibility per user
+├── test_paperless_permissions.py# Tag/document visibility per user (key test)
 └── test_nextcloud_upload.py     # WebDAV upload + file accessibility
 ```
+
+Init scripts are Python (not shell) to avoid curl/jq dependencies and to share
+logic with the test fixtures.
 
 ---
 
@@ -36,11 +66,11 @@ tests/integration/
 | `paperless-redis` | `redis:7-alpine` | Task queue for Paperless |
 | `paperless` | `ghcr.io/paperless-ngx/paperless-ngx:latest` | Paperless-ngx instance |
 | `nextcloud` | `nextcloud:latest` | Nextcloud instance (SQLite) |
-| `test-init` | `python:3.12-slim` | One-shot init container (runs init scripts, then exits) |
+| `test-init` | `python:3.12-slim` | One-shot container: calls REST/OCS APIs to create users, groups, tokens |
 
-Paperless uses SQLite (`PAPERLESS_DBENGINE=sqlite`) to avoid a separate DB container.
-Nextcloud uses its built-in SQLite. Both are stateless — volumes are ephemeral (no
-named volumes), so each `docker compose up` starts clean.
+Paperless uses `PAPERLESS_DBENGINE=sqlite` (supported, avoids a DB container).
+Nextcloud uses SQLite (default when no external DB is configured). Both use
+ephemeral anonymous volumes — each `docker compose up` starts clean.
 
 Ports exposed on localhost for manual access:
 - Paperless: `8010`
@@ -50,7 +80,7 @@ Ports exposed on localhost for manual access:
 
 ## Test Users & Group
 
-Defined in `.env.test` with fixed credentials:
+Defined in `.env.test` with fixed, non-secret credentials:
 
 | User | Role | Services |
 |---|---|---|
@@ -58,74 +88,75 @@ Defined in `.env.test` with fixed credentials:
 | `user1` | Regular, member of `TestFamily` group | Paperless, Nextcloud |
 | `user2` | Regular, member of `TestFamily` group | Paperless, Nextcloud |
 
-The `TestFamily` group in Paperless gets the same `GROUP_PERMISSIONS` as the
-production config.
-
 ---
 
-## Initialization Strategy
+## Initialization Strategy (corrected)
 
-**`test-init` container** runs after health checks confirm both services are up
-(using `depends_on: condition: service_healthy`), then executes both init scripts
-and exits with code 0.
+**`test-init` container** starts after both services pass their health checks
+(`depends_on: condition: service_healthy`), then runs both init scripts and
+exits 0. It shares the Docker network with the other services, so it can reach
+them by service name (e.g. `http://paperless:8000`).
 
-**`init_paperless.sh`** — runs inside the `paperless` container via `docker exec`
-(or as a sidecar using the shared network):
-1. `manage.py createsuperuser` → `admin`
-2. `manage.py createsuperuser` → `user1`, `user2`
-3. `manage.py drf_create_token admin` → captures token, writes to shared volume file
-4. REST API calls to create `TestFamily` group and add users
-5. REST API calls to verify group permissions
+**`init_paperless.py`** — uses the Paperless REST API over the shared network:
+1. Admin user is pre-created via env vars `PAPERLESS_ADMIN_USER` /
+   `PAPERLESS_ADMIN_PASSWORD` / `PAPERLESS_ADMIN_MAIL` — no `manage.py` needed
+2. Obtain admin token: `POST /api/token/` with admin credentials
+3. Create `user1`, `user2`: `POST /api/users/`
+4. Create `TestFamily` group with `GROUP_PERMISSIONS`: `POST /api/groups/`
+5. Add users to group: `PATCH /api/users/{id}/` with groups list
+6. Write admin token to shared volume `/test-config/paperless_token`
 
-**`init_nextcloud.sh`** — uses `php occ` commands:
-1. `occ user:add` → `user1`, `user2`
-2. `occ group:add TestFamily`
-3. `occ group:adduser TestFamily user1/user2`
-4. `occ files_sharing:create-share` → share `/Documents/Scans` from `admin` to group `TestFamily`
+**`init_nextcloud.py`** — uses the Nextcloud OCS Provisioning API:
+1. Admin user pre-configured via `NEXTCLOUD_ADMIN_USER` / `NEXTCLOUD_ADMIN_PASSWORD`
+2. Create `user1`, `user2`: `POST /ocs/v1.php/cloud/users`
+3. Create `TestFamily` group: `POST /ocs/v1.php/cloud/groups`
+4. Add users to group: `POST /ocs/v1.php/cloud/users/{user}/groups`
+5. Share `/Documents/Scans` with group: `POST /ocs/v2.php/apps/files_sharing/api/v1/shares`
 
-Tokens and credentials are written to a shared tmpfs volume (`/test-config/`) so
-pytest can read them without hardcoding.
+Both scripts poll their service's health endpoint before proceeding.
 
 ---
 
 ## pytest Architecture (`conftest.py`)
 
 **Session-scoped** (set up once per test run):
-- `paperless_admin_client` — `PaperlessUploader` using admin token
-- `paperless_user1_session` / `paperless_user2_session` — raw `requests.Session`
+- `paperless_admin_client` — `PaperlessUploader` with admin token, `TestFamily` group
+- `paperless_user1_session` / `paperless_user2_session` — `requests.Session`
   authenticated as user1/user2 for visibility assertions
 - `nextcloud_admin_uploader` — `NextcloudUploader` using admin credentials
 - `nextcloud_user1_session` — `requests.Session` for WebDAV PROPFIND as user1
 
-**Function-scoped**:
-- `uploaded_document(paperless_admin_client, ...)` — uploads a sample PDF, yields
-  the task result, then deletes it for cleanup
+Credentials are read from `.env.test` (not from the shared tmpfs volume — the
+tokens are fixed by the init script predictably enough to hardcode in `.env.test`).
 
-A session-scoped `wait_for_services()` fixture polls both health endpoints before
-any test runs (no fixed `sleep`).
+**Function-scoped**:
+- `uploaded_document` — uploads `fixtures/sample.pdf`, yields doc metadata,
+  deletes it on teardown via `DELETE /api/documents/{id}/`
+
+A session-scoped `wait_for_services()` fixture polls health endpoints with a
+timeout before any test runs.
 
 ---
 
 ## Test Cases
 
 **`test_paperless_upload.py`**
-- `test_upload_succeeds` — upload returns HTTP 202, task completes
+- `test_upload_succeeds` — returns HTTP 202, task polls to `SUCCESS`
 - `test_upload_sets_title` — document title matches
 - `test_upload_sets_date` — created date matches filename
 - `test_upload_creates_tags` — expected tag IDs present on document
 
-**`test_paperless_permissions.py`**
+**`test_paperless_permissions.py`** ← **most important: verifies the tag permissions fix**
 - `test_tag_visible_to_user1` — `GET /api/tags/?name=...` as user1 returns the tag
 - `test_tag_visible_to_user2` — same for user2
 - `test_document_visible_to_user1` — document appears in user1's document list
 - `test_document_not_visible_without_group` — upload without group → user1 cannot
-  see it (negative test)
+  see it (negative test, confirms permissions are not granted by default)
 
 **`test_nextcloud_upload.py`**
 - `test_upload_succeeds` — PUT returns 201
 - `test_file_accessible_to_admin` — PROPFIND as admin finds the file
-- `test_file_accessible_via_group_share` — PROPFIND as user1 finds the file in
-  the shared folder
+- `test_file_accessible_via_group_share` — PROPFIND as user1 finds the file
 
 ---
 
@@ -135,25 +166,25 @@ any test runs (no fixed `sleep`).
 # Manual exploration (services stay up, UIs accessible in browser)
 docker compose -f tests/integration/docker-compose.test.yml up
 
-# Automated (pytest drives everything, tears down after)
+# Automated
 docker compose -f tests/integration/docker-compose.test.yml up -d --wait
-pytest tests/integration/
+pytest tests/integration/ -v
 docker compose -f tests/integration/docker-compose.test.yml down -v
 ```
 
-A `Makefile` target `make test-integration` wraps these three steps.
+`make test-integration` wraps the automated steps.
 
 ---
 
 ## Key Design Decisions
 
-- **Ephemeral volumes** — no state bleeds between runs; `down -v` is a full reset.
-- **Fixed credentials in `.env.test`** — deliberately not secret, simplifies local
-  and CI use; `.env.test` is committed.
-- **Real services, no mocks** — tests call the actual `PaperlessUploader` /
-  `NextcloudUploader` classes, exercising the same code paths as production.
-- **Init via one-shot container** — keeps service containers clean; no custom
-  entrypoint patches needed.
-- **Paperless task polling** — `post_document` is async; tests must poll
-  `GET /api/tasks/?task_id=...` until status is `SUCCESS` before asserting
-  document metadata.
+- **No Docker socket** — init uses REST/OCS APIs over the shared Docker network,
+  not `docker exec`. Simpler and more portable.
+- **Ephemeral volumes** — `down -v` is a full reset; no state bleeds between runs.
+- **Fixed credentials in `.env.test`** — committed, non-secret; works locally and in CI.
+- **Real uploaders, no mocks** — tests call actual `PaperlessUploader` /
+  `NextcloudUploader` code, not HTTP doubles.
+- **Paperless task polling** — `post_document` is async; poll
+  `GET /api/tasks/?task_id=...` until `status == "SUCCESS"` before asserting.
+- **Init in Python** — avoids curl/jq shell dependencies; shares `requests`
+  which is already in the project's `requirements.txt`.
