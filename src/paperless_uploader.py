@@ -182,10 +182,16 @@ class PaperlessUploader:
                     return tag_id
             
             # Tag doesn't exist, create it
+            tag_data: Dict[str, Any] = {'name': tag_name}
+            if self._group_id:
+                tag_data['set_permissions'] = {
+                    'view': {'users': [], 'groups': [self._group_id]},
+                    'change': {'users': [], 'groups': [self._group_id]}
+                }
             response = requests.post(
                 f"{self.base_url}/api/tags/",
                 headers=self.headers,
-                json={'name': tag_name},
+                json=tag_data,
                 timeout=30
             )
             

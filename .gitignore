@@ -28,3 +28,4 @@ input/*.pdf
 output/*.pdf
 output/**/*.pdf
 samples/
+serverconfig/
