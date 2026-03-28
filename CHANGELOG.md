@@ -8,8 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.1] - 2026-03-28
 
-## [1.0.1] - 2026-03-28
-
 ### Fixed
 - Tags created via the Paperless-ngx API now receive group permissions (`set_permissions`)
   so all group members can see them, not just the API token owner
