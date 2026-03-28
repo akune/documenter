@@ -3,6 +3,7 @@
 
 ARG VERSION=dev
 FROM jbarlow83/ocrmypdf:latest
+ARG VERSION=dev
 LABEL org.opencontainers.image.version="${VERSION}"
 
 # Install additional system packages including python3-venv for creating venv with pip

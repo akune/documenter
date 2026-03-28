@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Dockerfile: re-declare `ARG VERSION` after `FROM` so the OCI version label is correctly set (fixes build warning)
 - SIGTERM (Docker stop/restart) now triggers graceful shutdown, same as Ctrl+C
 - Shutdown timeout increased from 5 s to 60 s so large PDFs finish processing before exit
 - Observer thread is now always joined via `finally`, even if the main loop exits unexpectedly
