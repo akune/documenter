@@ -1,0 +1,23 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [1.0.0] - 2026-03-28
+
+### Added
+- Initial Docker-based PDF document processor using OCRmyPDF
+- OCR with invisible text layer, deskew, rotation correction, and page cleaning
+- Blank page detection and removal
+- QR code–based document splitting (`[dmsqrnd]` marker)
+- Nextcloud upload via WebDAV
+- Paperless-ngx upload via REST API
+- Filename format `YYYY-MM-DD_hh-mm-ss_HASH.pdf` with date extraction
+- Tag template variable support (`${directory_path}`, `${year_month}`, `${filename}`, `${title}`)
+- Group-based document permissions in Paperless-ngx (`PAPERLESS_GROUP`)
+- Group permissions applied to newly created tags so all group members can see them
+- CLI tool (`paperless-import.sh`) for batch-importing existing documents
+- GitHub Actions workflow for multi-platform Docker Hub publishing (`linux/amd64`, `linux/arm64`)

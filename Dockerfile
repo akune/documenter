@@ -1,7 +1,9 @@
 # Document Processor
 # Based on OCRmyPDF image with additional Python packages
 
+ARG VERSION=dev
 FROM jbarlow83/ocrmypdf:latest
+LABEL org.opencontainers.image.version="${VERSION}"
 
 # Install additional system packages including python3-venv for creating venv with pip
 RUN apt-get update && apt-get install -y --no-install-recommends \
