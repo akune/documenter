@@ -1,6 +1,6 @@
 # Integration Test Setup
 
-> **Status: TODO** — Concept updated after feasibility review (2026-03-28).
+> **Status: DONE** — Implemented 2026-03-28.
 
 ---
 

@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Integration test setup: Docker Compose environment with Paperless-ngx, Nextcloud, Redis, and a one-shot init container
+- `tests/integration/init/init_paperless.py` — creates test users and TestFamily group via Paperless REST API
+- `tests/integration/init/init_nextcloud.py` — creates test users, group, and shares scan folder via Nextcloud OCS API
+- `tests/integration/conftest.py` — pytest session/function fixtures for uploaders, user sessions, and document lifecycle
+- `tests/integration/test_paperless_upload.py` — upload correctness tests (title, date, tags)
+- `tests/integration/test_paperless_permissions.py` — group permission tests, including regression test for tag visibility fix
+- `tests/integration/test_nextcloud_upload.py` — WebDAV upload, admin access, and group share visibility tests
+- `Makefile` with `make test-integration` target
+
 ### Fixed
 - Dockerfile: re-declare `ARG VERSION` after `FROM` so the OCI version label is correctly set (fixes build warning)
 - SIGTERM (Docker stop/restart) now triggers graceful shutdown, same as Ctrl+C
