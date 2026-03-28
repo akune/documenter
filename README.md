@@ -219,6 +219,24 @@ Pushing the tag triggers GitHub Actions to build and publish multi-platform Dock
 
 > **Note:** Add all changes under `## [Unreleased]` in `CHANGELOG.md` during development. Do not add the version header manually — the release script does this.
 
+## Integration Tests
+
+The integration test suite spins up real Paperless-ngx and Nextcloud instances via Docker Compose, initialises test users and a group, and runs all upload and permission tests against them.
+
+**Requirements:** Docker, `pytest`, and `requests` installed locally.
+
+```bash
+make test-integration
+```
+
+This brings up the test environment, waits for all services to be ready, runs the 13 tests, and tears everything down. Individual steps are also available:
+
+```bash
+make test-integration-up    # Start services and run init
+make test-integration-down  # Tear down and remove volumes
+make test-integration-logs  # View service logs
+```
+
 ## Troubleshooting
 
 ### Connection error to Nextcloud
@@ -249,4 +267,4 @@ Pushing the tag triggers GitHub Actions to build and publish multi-platform Dock
 - QR code must be clearly readable (sufficient contrast)
 - Content must exactly match `SPLIT_QR_CONTENT` (default: `[dmsqrnd]`)
 - QR-Code Generator: https://www.qr-code-generator.com/
-- Zum Testen: `SPLIT_QR_ENABLED=false` setzen
+- To disable temporarily: set `SPLIT_QR_ENABLED=false`
