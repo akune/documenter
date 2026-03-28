@@ -200,6 +200,25 @@ docker compose run --rm documenter python3 /app/src/paperless_import.py /documen
 | `--no-recursive`, `-R` | Do not search subdirectories |
 | `--verbose`, `-v` | Enable verbose output |
 
+## Releases
+
+Releases follow [Semantic Versioning](https://semver.org). All changes are documented in [CHANGELOG.md](CHANGELOG.md).
+
+### Creating a release
+
+```bash
+./scripts/release.sh <MAJOR.MINOR.PATCH>
+```
+
+The script will:
+1. Validate the version format and that the working directory is clean
+2. Update `VERSION` and collapse `[Unreleased]` into a dated version entry in `CHANGELOG.md`
+3. Commit, tag (`vX.Y.Z`), and push
+
+Pushing the tag triggers GitHub Actions to build and publish multi-platform Docker images (`linux/amd64`, `linux/arm64`) tagged as `X.Y.Z`, `X.Y`, and `latest`.
+
+> **Note:** Add all changes under `## [Unreleased]` in `CHANGELOG.md` during development. Do not add the version header manually — the release script does this.
+
 ## Troubleshooting
 
 ### Connection error to Nextcloud
