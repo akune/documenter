@@ -1,5 +1,7 @@
 # Integration Test Setup
 
+> **Status: TODO** — Concept documented, not yet implemented.
+
 ## Goal
 
 A Docker Compose–based environment with real Nextcloud and Paperless-ngx instances,
