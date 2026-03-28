@@ -6,6 +6,8 @@ Watches input directory and processes PDF files.
 import logging
 import os
 import queue
+import shutil
+import signal
 import sys
 import tempfile
 import threading
@@ -120,8 +122,6 @@ class DocumentProcessor:
         Returns:
             Tuple of (success, error_message)
         """
-        import shutil
-        
         try:
             # Determine target directory
             if self.config.output_dir_use_subfolders:
@@ -284,7 +284,6 @@ class DocumentProcessor:
                 # Clean up split directory
                 split_dir = os.path.join(self.config.temp_dir, "split")
                 if os.path.isdir(split_dir):
-                    import shutil
                     try:
                         shutil.rmtree(split_dir)
                     except Exception as e:
@@ -292,7 +291,6 @@ class DocumentProcessor:
                 # Clean up OCR directory
                 ocr_dir = os.path.join(self.config.temp_dir, "ocr")
                 if os.path.isdir(ocr_dir):
-                    import shutil
                     try:
                         shutil.rmtree(ocr_dir)
                     except Exception as e:
@@ -334,53 +332,65 @@ class DocumentProcessor:
             except Exception as e:
                 logger.exception(f"Worker loop error: {e}")
     
+    def _shutdown(self, observer: Observer, worker_thread: threading.Thread) -> None:
+        """Stop the observer and worker thread gracefully."""
+        logger.info("Shutting down...")
+        self.running = False
+        observer.stop()
+        observer.join()
+        worker_thread.join(timeout=60.0)
+        if worker_thread.is_alive():
+            logger.warning("Worker thread did not finish within timeout — it may still be processing a file.")
+        logger.info("Document Processor stopped.")
+
     def run(self):
         """Main run loop."""
         logger.info("Document Processor starting...")
         logger.info(f"Configuration:\n{self.config}")
-        
+
         # Validate configuration
         errors = self.config.validate()
         if errors:
             for error in errors:
                 logger.error(f"Configuration error: {error}")
             sys.exit(1)
-        
+
         # Ensure temp directory exists
         ensure_directory(self.config.temp_dir)
-        
+
         # Test connections
         if not self._test_connections():
             logger.warning("Some connection tests failed, continuing anyway...")
-        
+
         # Start worker thread
         self.running = True
         worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
         worker_thread.start()
-        
+
         # Process existing files
         self._process_existing_files()
-        
+
         # Set up file watcher
         event_handler = PDFEventHandler(self.processing_queue)
         observer = Observer()
         observer.schedule(event_handler, self.config.input_dir, recursive=False)
         observer.start()
-        
+
         logger.info(f"Watching for PDFs in: {self.config.input_dir}")
-        
+
+        # Handle both SIGTERM (Docker) and SIGINT (Ctrl+C) gracefully
+        def _handle_signal(*_):
+            raise KeyboardInterrupt
+
+        signal.signal(signal.SIGTERM, _handle_signal)
+
         try:
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            logger.info("Shutting down...")
-            self.running = False
-            observer.stop()
-        
-        observer.join()
-        worker_thread.join(timeout=5.0)
-        
-        logger.info("Document Processor stopped.")
+            pass
+        finally:
+            self._shutdown(observer, worker_thread)
 
 
 def main():

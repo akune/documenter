@@ -3,6 +3,7 @@ Paperless-ngx uploader module.
 Uploads documents to Paperless-ngx via REST API.
 """
 
+import json
 import logging
 import re
 from datetime import datetime
@@ -78,16 +79,16 @@ class PaperlessUploader:
             self._group_id = self._get_or_create_group(self._group_name)
     
     def _get_or_create_group(self, group_name: str) -> Optional[int]:
-        logger.info(f"Ensuring group exists in Paperless-ngx: '{group_name}'")
         """
         Get group ID by name, creating it with proper permissions if it doesn't exist.
-        
+
         Args:
             group_name: Name of the group
-        
+
         Returns:
             Group ID or None on error
         """
+        logger.info(f"Ensuring group exists in Paperless-ngx: '{group_name}'")
         if group_name in self._group_cache:
             return self._group_cache[group_name]
         
@@ -313,7 +314,6 @@ class PaperlessUploader:
                 
                 # Add group permissions if configured
                 if self._group_id:
-                    import json
                     permissions = {
                         'view': {'users': [], 'groups': [self._group_id]},
                         'change': {'users': [], 'groups': [self._group_id]}

@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- SIGTERM (Docker stop/restart) now triggers graceful shutdown, same as Ctrl+C
+- Shutdown timeout increased from 5 s to 60 s so large PDFs finish processing before exit
+- Observer thread is now always joined via `finally`, even if the main loop exits unexpectedly
+- Source file is no longer deleted when any upload step fails
+- Inline `import shutil` and `import json` moved to module-level imports
+- Misplaced docstring in `_get_or_create_group` moved above the first statement
+
 ## [1.0.1] - 2026-03-28
 
 ### Fixed
