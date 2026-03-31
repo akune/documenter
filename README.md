@@ -44,7 +44,7 @@ Simply place PDF files in the `./input` folder. They will automatically be:
 2. Cleared of blank pages
 3. OCR processed with text layer
 4. Split at QR code separator pages
-6. Renamed to `YYYY-MM-DD_hh-mm-ss_<MD5>.pdf`
+5. Renamed to `YYYY-MM-DD_hh-mm-ss_<MD5>.pdf`
 6. Uploaded to Nextcloud (subfolder `YYYY-MM`)
 7. Sent to Paperless-ngx with configured tags
 8. Deleted from input folder
@@ -94,6 +94,7 @@ All settings are controlled via environment variables:
 | `PAPERLESS_URL` | - | Server URL |
 | `PAPERLESS_API_TOKEN` | - | API token |
 | `PAPERLESS_DEFAULT_TAGS` | `Inbox` | Default tags (comma-separated, supports variables) |
+| `PAPERLESS_GROUP` | `` | Group name for document and tag permissions (optional) |
 
 **Tag Variables:** Tags can include variables that are resolved at upload time:
 

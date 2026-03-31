@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- README: added missing `PAPERLESS_GROUP` environment variable to configuration table
+- README: fixed duplicate step number in Quick Start list
+
 ## [1.1.0] - 2026-03-28
 
 ### Added
