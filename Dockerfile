@@ -2,7 +2,9 @@
 # Based on OCRmyPDF image with additional Python packages
 
 ARG VERSION=dev
-FROM jbarlow83/ocrmypdf:latest
+# Pinned: newer ocrmypdf images no longer run as root, which breaks the apt-get step below.
+# v17.4.0 is the base of the released v1.1.0 image; upgrade deliberately.
+FROM jbarlow83/ocrmypdf:v17.4.0
 ARG VERSION=dev
 LABEL org.opencontainers.image.version="${VERSION}"
 
