@@ -1,9 +1,12 @@
-watchdog>=3.0.0
-ocrmypdf>=16.0.0
-pikepdf>=8.0.0
-Pillow>=10.0.0
-pdf2image>=1.16.0
-requests>=2.31.0
-python-dotenv>=1.0.0
-pyzbar>=0.1.9
-numpy>=1.24.0
+# Pinned to the versions of the working v1.1.0 image. The ocrmypdf source tree in the
+# base image (/app/src/ocrmypdf, v17.4.0) shadows the pip package via PYTHONPATH, so
+# ocrmypdf must match the base image; upgrade both together.
+watchdog==6.0.0
+ocrmypdf==17.4.0
+pikepdf==10.5.1
+Pillow==12.1.1
+pdf2image==1.17.0
+requests==2.33.0
+python-dotenv==1.2.2
+pyzbar==0.1.9
+numpy==2.4.3

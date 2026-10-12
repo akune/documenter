@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Python dependencies pinned to the versions of the working v1.1.0 image. The v1.1.1 image installed ocrmypdf 17.13.0, while the ocrmypdf 17.4.0 source tree of the base image shadows it via `PYTHONPATH`. It then failed at startup with `ModuleNotFoundError: No module named 'deprecation'`. Do not use v1.1.1.
+
 ## [1.1.1] - 2026-10-12
 
 ### Fixed
