@@ -43,7 +43,7 @@ def auth_headers(token: str) -> dict:
     return {
         "Authorization": f"Token {token}",
         "Content-Type": "application/json",
-        "Accept": "application/json; version=6",
+        "Accept": "application/json; version=9",
     }
 
 

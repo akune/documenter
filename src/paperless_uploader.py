@@ -24,6 +24,12 @@ FILENAME_PATTERN = re.compile(
     re.IGNORECASE
 )
 
+# Paperless-ngx REST API version requested via the Accept header.
+# Paperless-ngx 3.x accepts only versions 9 and 10. Version 10 changes the
+# /api/tasks/ response (paginated, lowercase status), which _wait_for_task_result
+# relies on, so stay on 9 until that parsing is adapted.
+PAPERLESS_API_VERSION = 9
+
 
 def extract_date_from_filename(filename: str) -> Optional[datetime]:
     """
@@ -63,7 +69,7 @@ class PaperlessUploader:
         self.base_url = config.paperless_url.rstrip('/')
         self.headers = {
             'Authorization': f'Token {config.paperless_api_token}',
-            'Accept': 'application/json; version=6'
+            'Accept': f'application/json; version={PAPERLESS_API_VERSION}'
         }
         self.timeout = 120  # 2 minutes timeout for large files
         self._tag_cache: Dict[str, int] = {}  # Cache tag name -> ID mappings

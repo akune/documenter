@@ -47,7 +47,7 @@ def _wait_paperless(timeout: int = 120) -> None:
         try:
             r = requests.get(
                 f"{PAPERLESS_URL}/api/tags/",
-                headers={"Accept": "application/json; version=6",
+                headers={"Accept": "application/json; version=9",
                          "Authorization": "Token placeholder"},
                 timeout=5,
             )

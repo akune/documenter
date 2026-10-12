@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Paperless-ngx 3.x compatibility: the uploader now requests REST API version 9 instead of 6. Paperless-ngx 3.x rejects versions below 9 with `406 Invalid version in "Accept" header`, so tags (e.g. `Inbox/<yyyy-mm>`) were no longer looked up or created and new documents arrived without them. Version 10 is not used yet because it changes the `/api/tasks/` response format.
+- Integration tests: helpers, fixtures and the Paperless init script request API version 9 as well
 - README: added missing `PAPERLESS_GROUP` environment variable to configuration table
 - README: fixed duplicate step number in Quick Start list
 

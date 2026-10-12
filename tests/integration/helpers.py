@@ -68,7 +68,7 @@ def paperless_session(token: str) -> requests.Session:
     s = requests.Session()
     s.headers.update({
         "Authorization": f"Token {token}",
-        "Accept": "application/json; version=6",
+        "Accept": "application/json; version=9",
     })
     return s
 
