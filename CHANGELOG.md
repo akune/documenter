@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-27
+
 ### Added
 - Status web interface (port `WEB_PORT`, default 8080): lists queued, processing, done and failed documents with the current processing step, the generated files and their targets, and the error messages of failed documents. It marks failed source files that are still in the input folder. JSON at `/api/jobs`, health check at `/healthz`.
 - Job history in SQLite (`STATE_DB`, default `/data/documenter.db`), kept for `HISTORY_DAYS` (default 90). Jobs that were open when the service stopped are marked as interrupted.
