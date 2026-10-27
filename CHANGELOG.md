@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Status web interface (port `WEB_PORT`, default 8080): lists queued, processing, done and failed documents with the current processing step, the generated files and their targets, and the error messages of failed documents. It marks failed source files that are still in the input folder. JSON at `/api/jobs`, health check at `/healthz`.
+- Job history in SQLite (`STATE_DB`, default `/data/documenter.db`), kept for `HISTORY_DAYS` (default 90). Jobs that were open when the service stopped are marked as interrupted.
+- Unit tests for the job history and the web interface (`tests/unit`)
+
+### Changed
+- Duplicate file system events for the same file (e.g. create and move) no longer queue it twice, so they no longer show up as "file no longer exists" errors
+- `docker-compose.yml` publishes port 8080 and mounts `./data` for the job history
+
 ## [1.1.2] - 2026-10-12
 
 ### Fixed

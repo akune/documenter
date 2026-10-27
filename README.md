@@ -14,6 +14,7 @@ A Docker-based service for automatic processing of scanned PDF documents.
 - **Nextcloud upload** via WebDAV into `YYYY-MM` subfolders
 - **Paperless-ngx upload** with configurable tags
 - **Local output directory** (optional) for processed documents
+- **Status web interface** showing queued, processed and failed documents
 
 ## Quick Start
 
@@ -123,6 +124,28 @@ Example: `PAPERLESS_DEFAULT_TAGS=Inbox,Cabinet-${directory_path}`
 | `FILE_STABILITY_SECONDS` | `5` | Wait until file is fully written |
 | `LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR) |
 
+### Status Web Interface
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WEB_ENABLED` | `true` | Serve the status page |
+| `WEB_PORT` | `8080` | Port inside the container |
+| `STATE_DB` | `/data/documenter.db` | SQLite file with the job history |
+| `HISTORY_DAYS` | `90` | Days to keep finished jobs (`0` = forever) |
+
+## Status Web Interface
+
+Every PDF that arrives in the input folder becomes a job. The page at `http://<host>:<port>/` lists the jobs, newest first, and refreshes every 10 seconds:
+
+- **Queued** – detected, waiting for its turn
+- **Processing** – with the current step (blank page removal, splitting, OCR or upload of document *n/m*)
+- **Done** – with the generated file names and where they went (output directory, Nextcloud, Paperless-ngx)
+- **Failed** – with the error messages. A failed source file stays in the input folder; the page says so, and the file is picked up again on the next start.
+
+The buttons at the top filter by status. `GET /api/jobs` (optionally `?status=failed`) returns the same data as JSON, `GET /healthz` returns `ok`.
+
+Mount `/data` to keep the history across container updates (see `docker-compose.yml`). Jobs that were still open when the service stopped are marked as failed (“interrupted by service restart”). The page has no authentication and only reads; expose it on the local network only, or behind a reverse proxy with authentication.
+
 ## Creating a Nextcloud App Password
 
 1. Open Nextcloud → Settings → Security
@@ -147,6 +170,7 @@ documenter/
 ├── paperless-import.sh         # CLI wrapper for importing existing documents
 ├── input/                      # Place PDFs here
 ├── output/                     # Processed PDFs (optional)
+├── data/                       # Job history of the status web interface
 └── src/
     ├── main.py                 # Watchdog-based directory monitoring
     ├── config.py               # Configuration
@@ -156,6 +180,8 @@ documenter/
     ├── paperless_uploader.py   # Paperless-ngx API
     ├── paperless_import.py     # CLI tool for importing existing documents
     ├── template_resolver.py    # Variable substitution for tags
+    ├── job_store.py            # Job history (SQLite)
+    ├── web.py                  # Status web interface
     └── utils.py                # Utility functions
 ```
 
@@ -219,6 +245,14 @@ The script will:
 Pushing the tag triggers GitHub Actions to build and publish multi-platform Docker images (`linux/amd64`, `linux/arm64`) tagged as `X.Y.Z`, `X.Y`, and `latest`.
 
 > **Note:** Add all changes under `## [Unreleased]` in `CHANGELOG.md` during development. Do not add the version header manually — the release script does this.
+
+## Unit Tests
+
+The job history and the status page have unit tests that need nothing but Python and `pytest`:
+
+```bash
+pytest tests/unit
+```
 
 ## Integration Tests
 

@@ -5,6 +5,10 @@ services:
     container_name: documenter
     restart: unless-stopped
     
+    ports:
+      # Status web interface
+      - "8080:8080"
+    
     volumes:
       # Input directory for scanned PDFs
       - ./input:/input
@@ -12,6 +16,8 @@ services:
       - ./output:/output
       # Temporary processing directory (can use tmpfs for performance)
       - /tmp/documenter:/tmp/processing
+      # Job history for the status web interface
+      - ./data:/data
     
     environment:
       # Logging
@@ -54,6 +60,11 @@ services:
       - OUTPUT_DIR_ENABLED=${OUTPUT_DIR_ENABLED:-false}
       - OUTPUT_DIR=${OUTPUT_DIR:-/output}
       - OUTPUT_DIR_USE_SUBFOLDERS=${OUTPUT_DIR_USE_SUBFOLDERS:-true}
+      
+      # Status web interface and job history
+      - WEB_ENABLED=${WEB_ENABLED:-true}
+      - WEB_PORT=${WEB_PORT:-8080}
+      - HISTORY_DAYS=${HISTORY_DAYS:-90}
     
     # Optional: Use host network if needed for local services
     # network_mode: host

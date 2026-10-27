@@ -30,3 +30,6 @@ output/**/*.pdf
 samples/
 serverconfig/
 memory/
+
+# Job history of the status web interface
+data/

@@ -7,6 +7,7 @@ ARG VERSION=dev
 FROM jbarlow83/ocrmypdf:v17.4.0
 ARG VERSION=dev
 LABEL org.opencontainers.image.version="${VERSION}"
+ENV DOCUMENTER_VERSION=${VERSION}
 
 # Install additional system packages including python3-venv for creating venv with pip
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -33,14 +34,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source
 COPY src/ ./src/
 
-# Create input, output and temp directories
-RUN mkdir -p /input /output /tmp/processing
+# Create input, output, temp and state directories
+RUN mkdir -p /input /output /tmp/processing /data
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/src
 ENV INPUT_DIR=/input
 ENV TEMP_DIR=/tmp/processing
+
+# Status web interface (WEB_PORT)
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

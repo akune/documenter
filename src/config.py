@@ -67,7 +67,13 @@ class Config:
     output_dir_enabled: bool = field(default_factory=lambda: os.getenv("OUTPUT_DIR_ENABLED", "false").lower() == "true")
     output_dir: str = field(default_factory=lambda: os.getenv("OUTPUT_DIR", "/output"))
     output_dir_use_subfolders: bool = field(default_factory=lambda: os.getenv("OUTPUT_DIR_USE_SUBFOLDERS", "true").lower() == "true")
-    
+
+    # Status web interface and job history
+    web_enabled: bool = field(default_factory=lambda: os.getenv("WEB_ENABLED", "true").lower() == "true")
+    web_port: int = field(default_factory=lambda: int(os.getenv("WEB_PORT", "8080")))
+    state_db: str = field(default_factory=lambda: os.getenv("STATE_DB", "/data/documenter.db"))
+    history_days: int = field(default_factory=lambda: int(os.getenv("HISTORY_DAYS", "90")))
+
     def validate(self) -> List[str]:
         """Validate configuration and return list of errors."""
         errors = []
@@ -119,6 +125,10 @@ class Config:
             f"  output_dir={self.output_dir}\n"
             f"  output_dir_use_subfolders={self.output_dir_use_subfolders}\n"
             f"  delete_source={self.delete_source}\n"
+            f"  web_enabled={self.web_enabled}\n"
+            f"  web_port={self.web_port}\n"
+            f"  state_db={self.state_db}\n"
+            f"  history_days={self.history_days}\n"
             f")"
         )
 
