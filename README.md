@@ -1,5 +1,10 @@
 # Document Processor
 
+> **This repository is no longer maintained.**
+> Development continues in a private repository. The last version published here is **1.2.0**
+> (Docker Hub image `kune/documenter:1.2.0`). If you are interested in the current state,
+> just ask me – contact via my GitHub profile [@akune](https://github.com/akune).
+
 A Docker-based service for automatic processing of scanned PDF documents.
 
 ## Features
